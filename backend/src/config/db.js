@@ -31,7 +31,13 @@ async function connectDB() {
     mongoose.set('strictQuery', true);
     cached.promise = mongoose
       .connect(process.env.MONGODB_URI, {
-        serverSelectionTimeoutMS: 10000,
+        // Tuned for a serverless platform: fail fast if the cluster is
+        // unreachable, keep a small reusable pool, and don't let a single slow
+        // query hang the warm function forever.
+        serverSelectionTimeoutMS: 8000,
+        maxPoolSize: 10,
+        minPoolSize: 0,
+        socketTimeoutMS: 20000,
       })
       .then((m) => m);
   }

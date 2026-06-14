@@ -113,7 +113,8 @@ const listLeads = asyncHandler(async (req, res) => {
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(limit),
+      .limit(limit)
+      .lean(),
     Lead.countDocuments(filter),
   ]);
 
@@ -140,7 +141,8 @@ const todayFollowUps = asyncHandler(async (req, res) => {
 
   const leads = await Lead.find(filter)
     .populate('assignedTo', 'name email')
-    .sort({ nextFollowUpDate: 1, createdAt: -1 });
+    .sort({ nextFollowUpDate: 1, createdAt: -1 })
+    .lean();
   res.json(leads);
 });
 
@@ -148,9 +150,18 @@ const todayFollowUps = asyncHandler(async (req, res) => {
 // GET /api/leads/:id — single lead with its follow-up history
 // ---------------------------------------------------------------------------
 const getLead = asyncHandler(async (req, res) => {
-  const lead = await Lead.findById(req.params.id)
-    .populate('assignedTo', 'name email')
-    .populate('createdBy', 'name email');
+  // Fetch the lead and its follow-up history in parallel (the history is keyed
+  // by the lead id from the URL, so it doesn't need to wait for the lead query).
+  const [lead, followUps] = await Promise.all([
+    Lead.findById(req.params.id)
+      .populate('assignedTo', 'name email')
+      .populate('createdBy', 'name email')
+      .lean(),
+    FollowUp.find({ lead: req.params.id })
+      .populate('employee', 'name')
+      .sort({ date: -1, createdAt: -1 })
+      .lean(),
+  ]);
   if (!lead) {
     res.status(404);
     throw new Error('Lead not found');
@@ -159,9 +170,6 @@ const getLead = asyncHandler(async (req, res) => {
     res.status(403);
     throw new Error('Not your lead');
   }
-  const followUps = await FollowUp.find({ lead: lead._id })
-    .populate('employee', 'name')
-    .sort({ date: -1, createdAt: -1 });
   res.json({ lead, followUps });
 });
 
