@@ -1,4 +1,14 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
+
+// Some local networks/routers run a DNS resolver that refuses the SRV lookups
+// that `mongodb+srv://` requires. If DNS_SERVERS is set (e.g. "8.8.8.8,1.1.1.1")
+// use those resolvers instead. Not needed on Vercel (its DNS resolves SRV fine).
+if (process.env.DNS_SERVERS) {
+  dns.setServers(
+    process.env.DNS_SERVERS.split(',').map((s) => s.trim()).filter(Boolean)
+  );
+}
 
 /**
  * Cached connection so that on a serverless platform (Vercel) we reuse the
