@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useApiData } from '@/lib/useApiData';
 import type { ReportSummary, Lead } from '@/lib/types';
 import { OUTCOME_LABELS } from '@/lib/types';
 import { StatCard, Card, Button } from '@/components/ui';
@@ -11,16 +10,9 @@ import { formatMoney } from '@/lib/format';
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [summary, setSummary] = useState<ReportSummary | null>(null);
-  const [dueCount, setDueCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    api.get<ReportSummary>('/api/reports/summary').then(setSummary).catch(() => {});
-    api
-      .get<Lead[]>('/api/leads/today-followups')
-      .then((d) => setDueCount(d.length))
-      .catch(() => {});
-  }, []);
+  const { data: summary } = useApiData<ReportSummary>('/api/reports/summary');
+  const { data: dueLeads } = useApiData<Lead[]>('/api/leads/today-followups');
+  const dueCount = dueLeads ? dueLeads.length : null;
 
   return (
     <div className="flex flex-col gap-6">

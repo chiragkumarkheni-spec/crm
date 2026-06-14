@@ -1,22 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { useApiData } from '@/lib/useApiData';
 import type { Lead } from '@/lib/types';
 import { Card, StatusBadge } from '@/components/ui';
 import { formatDate } from '@/lib/format';
 
 export default function FollowUpsPage() {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api
-      .get<Lead[]>('/api/leads/today-followups')
-      .then(setLeads)
-      .finally(() => setLoading(false));
-  }, []);
+  const { data, loading } = useApiData<Lead[]>('/api/leads/today-followups');
+  const leads = data ?? [];
 
   return (
     <div className="flex flex-col gap-4">

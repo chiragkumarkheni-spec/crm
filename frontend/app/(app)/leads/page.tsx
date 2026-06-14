@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { useApiData } from '@/lib/useApiData';
 import type { Lead, LeadStatus } from '@/lib/types';
 import { STATUS_LABELS } from '@/lib/types';
 import { Card, Button, Field, inputClass, StatusBadge } from '@/components/ui';
@@ -24,21 +25,16 @@ const STATES = [
 ];
 
 export default function LeadsPage() {
-  const [data, setData] = useState<LeadsResponse | null>(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
 
-  const load = useCallback(() => {
-    const params = new URLSearchParams();
-    if (statusFilter) params.set('status', statusFilter);
-    if (search) params.set('search', search);
-    api.get<LeadsResponse>(`/api/leads?${params.toString()}`).then(setData).catch(() => {});
-  }, [statusFilter, search]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const params = new URLSearchParams();
+  if (statusFilter) params.set('status', statusFilter);
+  if (search) params.set('search', search);
+  const { data, refetch: load } = useApiData<LeadsResponse>(
+    `/api/leads?${params.toString()}`
+  );
 
   return (
     <div className="flex flex-col gap-4">
