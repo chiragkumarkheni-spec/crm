@@ -1,15 +1,30 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import type { Lead, FollowUp, Outcome, User } from '@/lib/types';
 import { OUTCOME_LABELS } from '@/lib/types';
 import { Card, Button, Field, inputClass, StatusBadge } from '@/components/ui';
 import { formatDate, formatDateTime, formatMoney } from '@/lib/format';
 
+// True if the given date string falls on the user's current calendar day.
+function isSameDay(dateStr?: string): boolean {
+  if (!dateStr) return false;
+  const d = new Date(dateStr);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
 export default function LeadDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const { user } = useAuth();
   const id = params.id;
   const [lead, setLead] = useState<Lead | null>(null);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
@@ -116,10 +131,16 @@ export default function LeadDetailPage() {
       </div>
 
       {/* Sample request */}
-      <SampleRequestCard lead={lead} onChange={load} />
+      <SampleRequestCard
+        lead={lead}
+        onChange={load}
+        canEdit={user?.role === 'admin' || !lead.sampleRequest?.requested || isSameDay(lead.sampleRequest?.date)}
+      />
 
-      {/* Record follow-up */}
-      {!isClosed && <FollowUpForm leadId={id} onSaved={load} />}
+      {/* Record follow-up — after saving, go back to the follow-ups screen */}
+      {!isClosed && (
+        <FollowUpForm leadId={id} onSaved={() => router.push('/follow-ups')} />
+      )}
       {isClosed && (
         <Card>
           <p className="text-slate-500">
@@ -246,41 +267,65 @@ function SampleCard({ lead, onChange }: { lead: Lead; onChange: () => void }) {
   );
 }
 
-function SampleRequestCard({ lead, onChange }: { lead: Lead; onChange: () => void }) {
-  const [desc, setDesc] = useState('');
+function SampleRequestCard({
+  lead,
+  onChange,
+  canEdit,
+}: {
+  lead: Lead;
+  onChange: () => void;
+  canEdit: boolean;
+}) {
+  const requested = !!lead.sampleRequest?.requested;
+  const [desc, setDesc] = useState(lead.sampleRequest?.description || '');
   const [busy, setBusy] = useState(false);
+
+  // Locked: already requested but the edit window (same day) has passed.
+  if (requested && !canEdit) {
+    return (
+      <Card>
+        <p className="text-sm font-medium text-slate-600 mb-2">Sample request</p>
+        <p className="text-sm text-slate-700">
+          Requested {formatDate(lead.sampleRequest?.date)} — {lead.sampleRequest?.description}
+        </p>
+        <p className="text-xs text-slate-400 mt-1">
+          🔒 Locked — can only be edited on the day it was recorded.
+        </p>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <p className="text-sm font-medium text-slate-600 mb-2">Sample request</p>
-      {lead.sampleRequest?.requested ? (
-        <p className="text-sm text-slate-700">
-          Requested {formatDate(lead.sampleRequest.date)} — {lead.sampleRequest.description}
+      {requested && (
+        <p className="text-xs text-slate-400 mb-2">
+          Recorded {formatDate(lead.sampleRequest?.date)} — editable today.
         </p>
-      ) : (
-        <div className="flex gap-2">
-          <input
-            className={`${inputClass} flex-1`}
-            placeholder="Describe the sample the lead asked for"
-            value={desc}
-            onChange={(e) => setDesc(e.target.value)}
-          />
-          <Button
-            variant="secondary"
-            disabled={busy || !desc}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await api.post(`/api/leads/${lead._id}/sample-request`, { description: desc });
-                onChange();
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Record request
-          </Button>
-        </div>
       )}
+      <div className="flex gap-2">
+        <input
+          className={`${inputClass} flex-1`}
+          placeholder="Describe the sample the lead asked for"
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+        />
+        <Button
+          variant="secondary"
+          disabled={busy || !desc.trim()}
+          onClick={async () => {
+            setBusy(true);
+            try {
+              await api.post(`/api/leads/${lead._id}/sample-request`, { description: desc });
+              onChange();
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {requested ? 'Update request' : 'Record request'}
+        </Button>
+      </div>
     </Card>
   );
 }

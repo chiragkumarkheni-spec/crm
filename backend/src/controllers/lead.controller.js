@@ -252,13 +252,34 @@ const recordSampleRequest = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('Lead not found');
   }
-  if (!req.body.description) {
+  // Must own the lead (admins can always touch it).
+  const owns =
+    lead.assignedTo.toString() === req.user._id.toString() ||
+    lead.createdBy.toString() === req.user._id.toString();
+  if (!isAdmin(req.user) && !owns) {
+    res.status(403);
+    throw new Error('Not your lead');
+  }
+  // Same-day edit lock: an employee may add or edit the sample request only on
+  // the day it was recorded. Once that day passes it is locked (admin exempt).
+  if (
+    !isAdmin(req.user) &&
+    lead.sampleRequest?.requested &&
+    lead.sampleRequest.date &&
+    !isToday(lead.sampleRequest.date)
+  ) {
+    res.status(403);
+    throw new Error(
+      'Sample request can only be edited on the same day it was recorded'
+    );
+  }
+  if (!req.body.description || !req.body.description.trim()) {
     res.status(400);
     throw new Error('Sample description is required');
   }
   lead.sampleRequest = {
     requested: true,
-    description: req.body.description,
+    description: req.body.description.trim(),
     date: new Date(),
   };
   await lead.save();
