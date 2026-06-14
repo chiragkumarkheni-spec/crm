@@ -17,7 +17,11 @@ const INDIAN_STATES = undefined; // free text for now; validated on the client
 const leadSchema = new mongoose.Schema(
   {
     // --- Core lead detail (matches an IndiaMart enquiry) ---
-    name: { type: String, trim: true }, // buyer / contact person name
+    name: {
+      type: String,
+      required: [true, 'Buyer name is required'],
+      trim: true,
+    }, // buyer / contact person name
     companyName: { type: String, trim: true }, // firm / company name
     mobileNumber: {
       type: String,

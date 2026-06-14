@@ -34,7 +34,11 @@ const createLead = asyncHandler(async (req, res) => {
     source,
     assignedTo,
   } = req.body;
-  if (!mobileNumber) {
+  if (!name || !name.trim()) {
+    res.status(400);
+    throw new Error('Buyer name is required');
+  }
+  if (!mobileNumber || !mobileNumber.trim()) {
     res.status(400);
     throw new Error('Mobile number is required');
   }

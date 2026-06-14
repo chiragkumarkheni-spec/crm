@@ -179,70 +179,97 @@ function AddLeadForm({ onCreated }: { onCreated: () => void }) {
           <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
         )}
 
-        {/* Buyer details */}
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Buyer name">
-            <input className={inputClass} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Contact person" />
-          </Field>
-          <Field label="Company / firm name">
-            <input className={inputClass} value={form.companyName} onChange={(e) => set('companyName', e.target.value)} />
-          </Field>
-          <Field label="Mobile number *">
-            <input
-              className={inputClass}
-              required
-              value={form.mobileNumber}
-              onChange={(e) => set('mobileNumber', e.target.value)}
-              placeholder="10-digit mobile"
-            />
-          </Field>
-          <Field label="Email">
-            <input type="email" className={inputClass} value={form.email} onChange={(e) => set('email', e.target.value)} />
-          </Field>
-          <Field label="City">
-            <input className={inputClass} value={form.city} onChange={(e) => set('city', e.target.value)} />
-          </Field>
-          <Field label="State">
-            <select className={inputClass} value={form.state} onChange={(e) => set('state', e.target.value)}>
-              <option value="">Select state</option>
-              {STATES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Address">
-            <input className={inputClass} value={form.address} onChange={(e) => set('address', e.target.value)} />
-          </Field>
+        {/* Required — the two compulsory fields, shown first */}
+        <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">
+            Required
+          </p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Buyer name *">
+              <input
+                className={inputClass}
+                required
+                value={form.name}
+                onChange={(e) => set('name', e.target.value)}
+                placeholder="Contact person"
+              />
+            </Field>
+            <Field label="Mobile number *">
+              <input
+                className={inputClass}
+                required
+                value={form.mobileNumber}
+                onChange={(e) => set('mobileNumber', e.target.value)}
+                placeholder="10-digit mobile"
+              />
+            </Field>
+          </div>
+        </div>
+
+        {/* Buyer details (optional) */}
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">
+            Buyer details
+          </p>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Company / firm name">
+              <input className={inputClass} value={form.companyName} onChange={(e) => set('companyName', e.target.value)} />
+            </Field>
+            <Field label="Email">
+              <input type="email" className={inputClass} value={form.email} onChange={(e) => set('email', e.target.value)} />
+            </Field>
+            <Field label="City">
+              <input className={inputClass} value={form.city} onChange={(e) => set('city', e.target.value)} />
+            </Field>
+            <Field label="State">
+              <select className={inputClass} value={form.state} onChange={(e) => set('state', e.target.value)}>
+                <option value="">Select state</option>
+                {STATES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Address">
+              <input className={inputClass} value={form.address} onChange={(e) => set('address', e.target.value)} />
+            </Field>
+          </div>
         </div>
 
         {/* Requirement */}
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Product required">
-            <input className={inputClass} value={form.product} onChange={(e) => set('product', e.target.value)} placeholder="e.g. Engine Oil 20W-40" />
-          </Field>
-          <Field label="Quantity">
-            <input className={inputClass} value={form.quantity} onChange={(e) => set('quantity', e.target.value)} placeholder="e.g. 200 Litre" />
-          </Field>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">
+            Requirement
+          </p>
+          <div className="flex flex-col gap-4">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Product required">
+                <input className={inputClass} value={form.product} onChange={(e) => set('product', e.target.value)} placeholder="e.g. Engine Oil 20W-40" />
+              </Field>
+              <Field label="Quantity">
+                <input className={inputClass} value={form.quantity} onChange={(e) => set('quantity', e.target.value)} placeholder="e.g. 200 Litre" />
+              </Field>
+            </div>
+            <Field label="Requirement / message">
+              <textarea
+                className={inputClass}
+                rows={2}
+                value={form.requirement}
+                onChange={(e) => set('requirement', e.target.value)}
+                placeholder="What the buyer asked for (copy from the IndiaMart enquiry)"
+              />
+            </Field>
+            <Field label="Source">
+              <select className={inputClass} value={form.source} onChange={(e) => set('source', e.target.value)}>
+                <option value="IndiaMart">IndiaMart</option>
+                <option value="TradeIndia">TradeIndia</option>
+                <option value="JustDial">JustDial</option>
+                <option value="Reference">Reference</option>
+                <option value="Walk-in">Walk-in</option>
+                <option value="Other">Other</option>
+              </select>
+            </Field>
+          </div>
         </div>
-        <Field label="Requirement / message">
-          <textarea
-            className={inputClass}
-            rows={2}
-            value={form.requirement}
-            onChange={(e) => set('requirement', e.target.value)}
-            placeholder="What the buyer asked for (copy from the IndiaMart enquiry)"
-          />
-        </Field>
-        <Field label="Source">
-          <select className={inputClass} value={form.source} onChange={(e) => set('source', e.target.value)}>
-            <option value="IndiaMart">IndiaMart</option>
-            <option value="TradeIndia">TradeIndia</option>
-            <option value="JustDial">JustDial</option>
-            <option value="Reference">Reference</option>
-            <option value="Walk-in">Walk-in</option>
-            <option value="Other">Other</option>
-          </select>
-        </Field>
 
         <div>
           <Button type="submit" disabled={saving}>
