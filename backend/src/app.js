@@ -28,7 +28,15 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
-// Ensure a DB connection exists before handling any /api request.
+// --- Health check (no DB required) ---
+app.get('/', (req, res) => {
+  res.json({ name: 'Nexton Lubricants CRM API', status: 'ok' });
+});
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
+// Ensure a DB connection exists before handling any data request below.
 app.use(async (req, res, next) => {
   try {
     await connectDB();
@@ -36,14 +44,6 @@ app.use(async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-});
-
-// --- Health check ---
-app.get('/', (req, res) => {
-  res.json({ name: 'Nexton Lubricants CRM API', status: 'ok' });
-});
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
 // --- Routes ---
