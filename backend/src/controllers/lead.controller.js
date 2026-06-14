@@ -42,6 +42,10 @@ const createLead = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Mobile number is required');
   }
+  if (!/^\d{10}$/.test(mobileNumber.trim())) {
+    res.status(400);
+    throw new Error('Mobile number must be exactly 10 digits');
+  }
 
   // Lead date is always "today" on the server — back-dated leads are not allowed.
   const leadDate = new Date();

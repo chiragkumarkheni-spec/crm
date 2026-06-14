@@ -198,10 +198,21 @@ function AddLeadForm({ onCreated }: { onCreated: () => void }) {
               <input
                 className={inputClass}
                 required
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                pattern="\d{10}"
+                title="Enter exactly 10 digits"
                 value={form.mobileNumber}
-                onChange={(e) => set('mobileNumber', e.target.value)}
+                onChange={(e) => set('mobileNumber', e.target.value.replace(/\D/g, '').slice(0, 10))}
                 placeholder="10-digit mobile"
               />
+              {form.mobileNumber.length > 0 && form.mobileNumber.length < 10 && (
+                <span className="mt-1 block text-xs text-rose-600">
+                  {10 - form.mobileNumber.length} more digit
+                  {10 - form.mobileNumber.length > 1 ? 's' : ''} needed
+                </span>
+              )}
             </Field>
           </div>
         </div>

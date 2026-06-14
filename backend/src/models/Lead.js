@@ -27,6 +27,7 @@ const leadSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Mobile number is required'],
       trim: true,
+      match: [/^\d{10}$/, 'Mobile number must be exactly 10 digits'],
     },
     email: { type: String, trim: true, lowercase: true },
     address: { type: String, trim: true },
