@@ -16,15 +16,24 @@ const INDIAN_STATES = undefined; // free text for now; validated on the client
 
 const leadSchema = new mongoose.Schema(
   {
-    // --- Core lead detail ---
-    name: { type: String, trim: true }, // contact / firm name (optional)
+    // --- Core lead detail (matches an IndiaMart enquiry) ---
+    name: { type: String, trim: true }, // buyer / contact person name
+    companyName: { type: String, trim: true }, // firm / company name
     mobileNumber: {
       type: String,
       required: [true, 'Mobile number is required'],
       trim: true,
     },
+    email: { type: String, trim: true, lowercase: true },
     address: { type: String, trim: true },
+    city: { type: String, trim: true },
     state: { type: String, trim: true },
+
+    // --- What the lead enquired about (the IndiaMart requirement) ---
+    product: { type: String, trim: true }, // product the buyer wants
+    quantity: { type: String, trim: true }, // e.g. "200 Litre" (free text + unit)
+    requirement: { type: String, trim: true }, // the enquiry / requirement message
+    source: { type: String, trim: true, default: 'IndiaMart' }, // where the lead came from
 
     // --- Ownership ---
     createdBy: {

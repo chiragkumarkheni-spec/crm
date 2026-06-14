@@ -20,7 +20,20 @@ function canEditLead(user, lead) {
 // POST /api/leads — create a lead (current date only, no back-dating)
 // ---------------------------------------------------------------------------
 const createLead = asyncHandler(async (req, res) => {
-  const { name, mobileNumber, address, state, assignedTo } = req.body;
+  const {
+    name,
+    companyName,
+    mobileNumber,
+    email,
+    address,
+    city,
+    state,
+    product,
+    quantity,
+    requirement,
+    source,
+    assignedTo,
+  } = req.body;
   if (!mobileNumber) {
     res.status(400);
     throw new Error('Mobile number is required');
@@ -35,9 +48,16 @@ const createLead = asyncHandler(async (req, res) => {
 
   const lead = await Lead.create({
     name,
+    companyName,
     mobileNumber,
+    email,
     address,
+    city,
     state,
+    product,
+    quantity,
+    requirement,
+    source: source || 'IndiaMart',
     createdBy: req.user._id,
     assignedTo: owner,
     leadDate,
@@ -72,7 +92,10 @@ const listLeads = asyncHandler(async (req, res) => {
   if (search) {
     filter.$or = [
       { name: new RegExp(search, 'i') },
+      { companyName: new RegExp(search, 'i') },
       { mobileNumber: new RegExp(search, 'i') },
+      { email: new RegExp(search, 'i') },
+      { product: new RegExp(search, 'i') },
     ];
   }
 
@@ -142,7 +165,20 @@ const updateLead = asyncHandler(async (req, res) => {
       'This lead can no longer be edited (only same-day edits are allowed)'
     );
   }
-  const editable = ['name', 'mobileNumber', 'address', 'state', 'notes'];
+  const editable = [
+    'name',
+    'companyName',
+    'mobileNumber',
+    'email',
+    'address',
+    'city',
+    'state',
+    'product',
+    'quantity',
+    'requirement',
+    'source',
+    'notes',
+  ];
   for (const f of editable) {
     if (req.body[f] !== undefined) lead[f] = req.body[f];
   }

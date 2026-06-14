@@ -42,11 +42,18 @@ export default function LeadDetailPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">{lead.name || 'Unnamed lead'}</h1>
-          <p className="text-slate-600">{lead.mobileNumber}</p>
+          {lead.companyName && (
+            <p className="text-slate-700 font-medium">{lead.companyName}</p>
+          )}
+          <p className="text-slate-600">
+            {lead.mobileNumber}
+            {lead.email ? ` · ${lead.email}` : ''}
+          </p>
           <p className="text-sm text-slate-500">
-            {lead.address ? `${lead.address}, ` : ''}
-            {lead.state || '—'} · added {formatDate(lead.leadDate)}
+            {[lead.address, lead.city, lead.state].filter(Boolean).join(', ') || '—'} · added{' '}
+            {formatDate(lead.leadDate)}
             {assignedName && ` · ${assignedName}`}
+            {lead.source && ` · via ${lead.source}`}
           </p>
         </div>
         <div className="text-right flex flex-col items-end gap-2">
@@ -58,6 +65,28 @@ export default function LeadDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Requirement / enquiry detail */}
+      {(lead.product || lead.quantity || lead.requirement) && (
+        <Card className="flex flex-col gap-1">
+          <p className="text-sm font-medium text-slate-600">Requirement</p>
+          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-700">
+            {lead.product && (
+              <span>
+                <span className="text-slate-400">Product:</span> {lead.product}
+              </span>
+            )}
+            {lead.quantity && (
+              <span>
+                <span className="text-slate-400">Quantity:</span> {lead.quantity}
+              </span>
+            )}
+          </div>
+          {lead.requirement && (
+            <p className="text-sm text-slate-700 mt-1">{lead.requirement}</p>
+          )}
+        </Card>
+      )}
 
       {/* Action flags: catalogue / sample / whatsapp */}
       <div className="grid sm:grid-cols-3 gap-4">

@@ -59,7 +59,7 @@ export default function LeadsPage() {
       )}
 
       <Card className="flex flex-wrap gap-3 items-end">
-        <Field label="Search (name / mobile)">
+        <Field label="Search (name / company / mobile / product)">
           <input
             className={inputClass}
             value={search}
@@ -91,7 +91,9 @@ export default function LeadsPage() {
           <thead className="bg-slate-50 text-left text-slate-500">
             <tr>
               <th className="px-4 py-3 font-medium">Name</th>
+              <th className="px-4 py-3 font-medium">Company</th>
               <th className="px-4 py-3 font-medium">Mobile</th>
+              <th className="px-4 py-3 font-medium">Product</th>
               <th className="px-4 py-3 font-medium">State</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Next follow-up</th>
@@ -106,7 +108,9 @@ export default function LeadsPage() {
                     {lead.name || 'Unnamed'}
                   </Link>
                 </td>
+                <td className="px-4 py-3 text-slate-600">{lead.companyName || '—'}</td>
                 <td className="px-4 py-3 text-slate-600">{lead.mobileNumber}</td>
+                <td className="px-4 py-3 text-slate-600">{lead.product || '—'}</td>
                 <td className="px-4 py-3 text-slate-600">{lead.state || '—'}</td>
                 <td className="px-4 py-3"><StatusBadge status={lead.status} /></td>
                 <td className="px-4 py-3 text-slate-600">{formatDate(lead.nextFollowUpDate)}</td>
@@ -115,7 +119,7 @@ export default function LeadsPage() {
             ))}
             {data && data.items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
                   No leads found.
                 </td>
               </tr>
@@ -128,7 +132,19 @@ export default function LeadsPage() {
 }
 
 function AddLeadForm({ onCreated }: { onCreated: () => void }) {
-  const [form, setForm] = useState({ name: '', mobileNumber: '', address: '', state: '' });
+  const [form, setForm] = useState({
+    name: '',
+    companyName: '',
+    mobileNumber: '',
+    email: '',
+    city: '',
+    state: '',
+    address: '',
+    product: '',
+    quantity: '',
+    requirement: '',
+    source: 'IndiaMart',
+  });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -154,7 +170,7 @@ function AddLeadForm({ onCreated }: { onCreated: () => void }) {
     <Card>
       <form onSubmit={submit} className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold">New lead</h2>
+          <h2 className="font-semibold">New lead (IndiaMart enquiry)</h2>
           <span className="text-xs text-slate-400">
             Dated today automatically — back-dated leads are not allowed.
           </span>
@@ -162,9 +178,14 @@ function AddLeadForm({ onCreated }: { onCreated: () => void }) {
         {error && (
           <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
         )}
+
+        {/* Buyer details */}
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Contact / firm name">
-            <input className={inputClass} value={form.name} onChange={(e) => set('name', e.target.value)} />
+          <Field label="Buyer name">
+            <input className={inputClass} value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Contact person" />
+          </Field>
+          <Field label="Company / firm name">
+            <input className={inputClass} value={form.companyName} onChange={(e) => set('companyName', e.target.value)} />
           </Field>
           <Field label="Mobile number *">
             <input
@@ -174,6 +195,12 @@ function AddLeadForm({ onCreated }: { onCreated: () => void }) {
               onChange={(e) => set('mobileNumber', e.target.value)}
               placeholder="10-digit mobile"
             />
+          </Field>
+          <Field label="Email">
+            <input type="email" className={inputClass} value={form.email} onChange={(e) => set('email', e.target.value)} />
+          </Field>
+          <Field label="City">
+            <input className={inputClass} value={form.city} onChange={(e) => set('city', e.target.value)} />
           </Field>
           <Field label="State">
             <select className={inputClass} value={form.state} onChange={(e) => set('state', e.target.value)}>
@@ -187,6 +214,36 @@ function AddLeadForm({ onCreated }: { onCreated: () => void }) {
             <input className={inputClass} value={form.address} onChange={(e) => set('address', e.target.value)} />
           </Field>
         </div>
+
+        {/* Requirement */}
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Product required">
+            <input className={inputClass} value={form.product} onChange={(e) => set('product', e.target.value)} placeholder="e.g. Engine Oil 20W-40" />
+          </Field>
+          <Field label="Quantity">
+            <input className={inputClass} value={form.quantity} onChange={(e) => set('quantity', e.target.value)} placeholder="e.g. 200 Litre" />
+          </Field>
+        </div>
+        <Field label="Requirement / message">
+          <textarea
+            className={inputClass}
+            rows={2}
+            value={form.requirement}
+            onChange={(e) => set('requirement', e.target.value)}
+            placeholder="What the buyer asked for (copy from the IndiaMart enquiry)"
+          />
+        </Field>
+        <Field label="Source">
+          <select className={inputClass} value={form.source} onChange={(e) => set('source', e.target.value)}>
+            <option value="IndiaMart">IndiaMart</option>
+            <option value="TradeIndia">TradeIndia</option>
+            <option value="JustDial">JustDial</option>
+            <option value="Reference">Reference</option>
+            <option value="Walk-in">Walk-in</option>
+            <option value="Other">Other</option>
+          </select>
+        </Field>
+
         <div>
           <Button type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Add lead'}

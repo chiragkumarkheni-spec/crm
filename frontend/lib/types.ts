@@ -29,9 +29,16 @@ export interface SentFlag {
 export interface Lead {
   _id: string;
   name?: string;
+  companyName?: string;
   mobileNumber: string;
+  email?: string;
   address?: string;
+  city?: string;
   state?: string;
+  product?: string;
+  quantity?: string;
+  requirement?: string;
+  source?: string;
   createdBy?: User | string;
   assignedTo?: User | string;
   leadDate: string;
