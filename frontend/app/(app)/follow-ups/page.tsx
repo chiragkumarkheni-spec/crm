@@ -23,7 +23,7 @@ export default function FollowUpsPage() {
       <div>
         <h1 className="text-2xl font-bold">Today&apos;s follow-ups</h1>
         <p className="text-slate-500 text-sm">
-          Leads due for a call today or overdue. Open one to record the call.
+          New leads plus anything due or overdue for a call. Open one to record the call.
         </p>
       </div>
 
@@ -52,8 +52,10 @@ export default function FollowUpsPage() {
                         <span className="text-slate-600">{lead.mobileNumber}</span>
                       </p>
                       <p className="text-sm text-slate-500">
-                        {lead.state || '—'} · {lead.followUpCount} follow-ups ·
-                        next {formatDate(lead.nextFollowUpDate)}
+                        {lead.state || '—'} · {lead.followUpCount} follow-ups ·{' '}
+                        {lead.nextFollowUpDate
+                          ? `next ${formatDate(lead.nextFollowUpDate)}`
+                          : 'new — first call pending'}
                         {overdue && (
                           <span className="ml-2 text-rose-600 font-medium">
                             overdue

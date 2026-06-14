@@ -125,15 +125,22 @@ const listLeads = asyncHandler(async (req, res) => {
 // ---------------------------------------------------------------------------
 const todayFollowUps = asyncHandler(async (req, res) => {
   const filter = {
-    nextFollowUpDate: { $lte: endOfDay() },
     status: { $nin: ['converted', 'lost'] },
+    // Show a lead on the daily screen if it is due/overdue for a follow-up OR
+    // it is a brand-new lead that has never been worked (no next date yet) —
+    // those still need their first call today.
+    $or: [
+      { nextFollowUpDate: { $lte: endOfDay() } },
+      { nextFollowUpDate: null },
+      { nextFollowUpDate: { $exists: false } },
+    ],
   };
   if (!isAdmin(req.user)) filter.assignedTo = req.user._id;
   else if (req.query.employee) filter.assignedTo = req.query.employee;
 
   const leads = await Lead.find(filter)
     .populate('assignedTo', 'name email')
-    .sort({ nextFollowUpDate: 1 });
+    .sort({ nextFollowUpDate: 1, createdAt: -1 });
   res.json(leads);
 });
 
