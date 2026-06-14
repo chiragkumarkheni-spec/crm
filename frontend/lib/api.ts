@@ -1,5 +1,11 @@
+// Prefer the explicit env var (set in Vercel). If it's missing, fall back to the
+// deployed backend in production and to localhost during local development, so the
+// live site works even without the env var configured.
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === 'production'
+    ? 'https://crm-kki4.vercel.app'
+    : 'http://localhost:5000');
 
 const TOKEN_KEY = 'nexton_token';
 
