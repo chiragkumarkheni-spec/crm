@@ -1,9 +1,13 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 
-// GET /api/users  (admin) — list employees/admins
+// GET /api/users  (admin) — list active users, or the Recycle Bin (?deleted=true)
 const listUsers = asyncHandler(async (req, res) => {
-  const users = await User.find().sort({ createdAt: -1 });
+  const wantDeleted = req.query.deleted === 'true';
+  const filter = wantDeleted ? { deleted: true } : { deleted: { $ne: true } };
+  const users = await User.find(filter).sort(
+    wantDeleted ? { deletedAt: -1 } : { createdAt: -1 }
+  );
   res.json(users);
 });
 
@@ -45,4 +49,42 @@ const updateUser = asyncHandler(async (req, res) => {
   res.json(user);
 });
 
-module.exports = { listUsers, createUser, updateUser };
+// DELETE /api/users/:id  (admin) — soft delete: move the user to the Recycle Bin.
+// The record is kept in the database (never hard-deleted); it is just hidden and
+// deactivated so the person can no longer log in. It can be restored later.
+const deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+  if (user._id.toString() === req.user._id.toString()) {
+    res.status(400);
+    throw new Error('You cannot delete your own account');
+  }
+  if (user.role === 'admin') {
+    res.status(400);
+    throw new Error('Admin accounts cannot be deleted');
+  }
+  user.deleted = true;
+  user.deletedAt = new Date();
+  user.active = false; // a deleted user cannot log in
+  await user.save();
+  res.json(user);
+});
+
+// POST /api/users/:id/restore  (admin) — bring a user back from the Recycle Bin.
+const restoreUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+  user.deleted = false;
+  user.deletedAt = undefined;
+  user.active = true;
+  await user.save();
+  res.json(user);
+});
+
+module.exports = { listUsers, createUser, updateUser, deleteUser, restoreUser };

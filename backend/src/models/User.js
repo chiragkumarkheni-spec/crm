@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema(
       default: 'employee',
     },
     active: { type: Boolean, default: true },
+    // Soft delete: a "deleted" user is moved to the Recycle Bin (hidden from
+    // the main list and unable to log in) but never removed from the database.
+    deleted: { type: Boolean, default: false },
+    deletedAt: { type: Date },
   },
   { timestamps: true }
 );

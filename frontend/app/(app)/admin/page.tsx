@@ -9,12 +9,14 @@ import { formatDate } from '@/lib/format';
 
 export default function AdminPage() {
   const { user } = useAuth();
+  const [tab, setTab] = useState<'active' | 'bin'>('active');
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
 
   const load = useCallback(() => {
-    api.get<User[]>('/api/users').then(setUsers).catch(() => {});
-  }, []);
+    const path = tab === 'bin' ? '/api/users?deleted=true' : '/api/users';
+    api.get<User[]>(path).then(setUsers).catch(() => {});
+  }, [tab]);
 
   useEffect(() => {
     load();
@@ -29,16 +31,59 @@ export default function AdminPage() {
     load();
   }
 
+  async function moveToBin(u: User) {
+    if (
+      !confirm(
+        `Move "${u.name}" to the Recycle Bin? They won't be able to log in. You can restore them later.`
+      )
+    ) {
+      return;
+    }
+    await api.delete(`/api/users/${u._id}`);
+    load();
+  }
+
+  async function restore(u: User) {
+    await api.post(`/api/users/${u._id}/restore`);
+    load();
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Admin · Employees</h1>
-        <Button onClick={() => setShowForm((s) => !s)}>
-          {showForm ? 'Close' : '+ Add employee'}
-        </Button>
+        {tab === 'active' && (
+          <Button onClick={() => setShowForm((s) => !s)}>
+            {showForm ? 'Close' : '+ Add employee'}
+          </Button>
+        )}
       </div>
 
-      {showForm && (
+      {/* Tabs: Active employees vs Recycle Bin */}
+      <div className="flex w-fit gap-1 rounded-xl bg-stone-100 p-1">
+        <button
+          onClick={() => setTab('active')}
+          className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+            tab === 'active'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Employees
+        </button>
+        <button
+          onClick={() => setTab('bin')}
+          className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+            tab === 'bin'
+              ? 'bg-white text-slate-900 shadow-sm'
+              : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          🗑 Recycle Bin
+        </button>
+      </div>
+
+      {tab === 'active' && showForm && (
         <AddUserForm
           onCreated={() => {
             setShowForm(false);
@@ -47,21 +92,32 @@ export default function AdminPage() {
         />
       )}
 
+      {tab === 'bin' && (
+        <p className="text-sm text-slate-500">
+          Deleted employees are kept here safely and can be restored anytime. For
+          data safety, they cannot be permanently removed.
+        </p>
+      )}
+
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
+          <thead className="bg-stone-50 text-left text-slate-500">
             <tr>
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Email</th>
               <th className="px-4 py-3 font-medium">Role</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Joined</th>
+              <th className="px-4 py-3 font-medium">
+                {tab === 'bin' ? 'Deleted' : 'Status'}
+              </th>
+              <th className="px-4 py-3 font-medium">
+                {tab === 'bin' ? '' : 'Joined'}
+              </th>
               <th className="px-4 py-3 font-medium"></th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u._id} className="border-t border-slate-100">
+              <tr key={u._id} className="border-t border-stone-100">
                 <td className="px-4 py-3 font-medium">{u.name}</td>
                 <td className="px-4 py-3 text-slate-600">{u.email}</td>
                 <td className="px-4 py-3">
@@ -69,21 +125,49 @@ export default function AdminPage() {
                     {u.role}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <span className={u.active ? 'text-green-700' : 'text-rose-600'}>
-                    {u.active ? 'Active' : 'Disabled'}
-                  </span>
+                {tab === 'bin' ? (
+                  <td className="px-4 py-3 text-slate-600">{formatDate(u.deletedAt)}</td>
+                ) : (
+                  <td className="px-4 py-3">
+                    <span className={u.active ? 'text-green-700' : 'text-rose-600'}>
+                      {u.active ? 'Active' : 'Disabled'}
+                    </span>
+                  </td>
+                )}
+                <td className="px-4 py-3 text-slate-600">
+                  {tab === 'bin' ? '' : formatDate(u.createdAt)}
                 </td>
-                <td className="px-4 py-3 text-slate-600">{formatDate(u.createdAt)}</td>
-                <td className="px-4 py-3 text-right">
-                  {u._id !== user._id && (
-                    <Button variant="secondary" onClick={() => toggleActive(u)}>
-                      {u.active ? 'Disable' : 'Enable'}
-                    </Button>
-                  )}
+                <td className="px-4 py-3">
+                  <div className="flex justify-end gap-2">
+                    {tab === 'bin' ? (
+                      <Button variant="secondary" onClick={() => restore(u)}>
+                        ↩ Restore
+                      </Button>
+                    ) : (
+                      u._id !== user._id && (
+                        <>
+                          <Button variant="secondary" onClick={() => toggleActive(u)}>
+                            {u.active ? 'Disable' : 'Enable'}
+                          </Button>
+                          {u.role !== 'admin' && (
+                            <Button variant="danger" onClick={() => moveToBin(u)}>
+                              Delete
+                            </Button>
+                          )}
+                        </>
+                      )
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
+            {users.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                  {tab === 'bin' ? 'Recycle Bin is empty.' : 'No employees yet.'}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </Card>
