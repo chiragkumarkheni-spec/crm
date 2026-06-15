@@ -55,12 +55,12 @@ export default function LeadsPage() {
       )}
 
       <Card className="flex flex-wrap gap-3 items-end">
-        <Field label="Search (name / company / mobile / product)">
+        <Field label="Search a lead (e.g. when someone calls you)">
           <input
             className={inputClass}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search…"
+            placeholder="Type mobile number, name or company…"
           />
         </Field>
         <Field label="Status">
