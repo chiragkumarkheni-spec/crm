@@ -222,7 +222,7 @@ function AddLeadForm({ onCreated }: { onCreated: () => void }) {
             <Field label="Company / firm name">
               <input className={inputClass} value={form.companyName} onChange={(e) => set('companyName', e.target.value)} />
             </Field>
-            <Field label="Email">
+            <Field label="Email (optional)">
               <input type="email" className={inputClass} value={form.email} onChange={(e) => set('email', e.target.value)} />
             </Field>
             <Field label="City">
