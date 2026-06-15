@@ -25,44 +25,58 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex-1 grid place-items-center p-4">
-      <form
-        onSubmit={onSubmit}
-        className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-8 shadow-sm flex flex-col gap-4"
-      >
-        <div className="text-center">
-          <h1 className="text-xl font-bold">Nexton Lubricants</h1>
-          <p className="text-sm text-slate-500">CRM — sign in to continue</p>
-        </div>
-        {error && (
-          <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
-            {error}
+    <div className="flex-1 grid place-items-center p-4 bg-gradient-to-br from-brand-50 via-canvas to-stone-100">
+      <div className="w-full max-w-sm flex flex-col items-center gap-6">
+        {/* Brand mark */}
+        <div className="flex flex-col items-center gap-3">
+          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-brand-500 text-2xl font-bold text-white shadow-lg shadow-brand-500/30">
+            N
+          </span>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              Nexton Lubricants
+            </h1>
+            <p className="text-sm text-slate-500">Distributor &amp; lead management</p>
           </div>
-        )}
-        <Field label="Email">
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={inputClass}
-            placeholder="you@nexton.com"
-          />
-        </Field>
-        <Field label="Password">
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={inputClass}
-            placeholder="••••••••"
-          />
-        </Field>
-        <Button type="submit" disabled={loading} className="mt-2">
-          {loading ? 'Signing in…' : 'Sign in'}
-        </Button>
-      </form>
+        </div>
+
+        <form
+          onSubmit={onSubmit}
+          className="w-full rounded-2xl border border-stone-200 bg-white p-7 shadow-xl shadow-stone-300/30 flex flex-col gap-4"
+        >
+          <p className="text-sm font-semibold text-slate-900">Sign in to continue</p>
+          {error && (
+            <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">
+              {error}
+            </div>
+          )}
+          <Field label="Email">
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={inputClass}
+              placeholder="you@nexton.com"
+            />
+          </Field>
+          <Field label="Password">
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={inputClass}
+              placeholder="••••••••"
+            />
+          </Field>
+          <Button type="submit" disabled={loading} className="mt-2 w-full">
+            {loading ? 'Signing in…' : 'Sign in'}
+          </Button>
+        </form>
+
+        <p className="text-xs text-slate-400">© Nexton Lubricants · Internal CRM</p>
+      </div>
     </div>
   );
 }

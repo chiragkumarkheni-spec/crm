@@ -6,6 +6,7 @@ import { useApiData } from '@/lib/useApiData';
 import type { ReportSummary, Lead } from '@/lib/types';
 import { OUTCOME_LABELS } from '@/lib/types';
 import { StatCard, Card, Button } from '@/components/ui';
+import { IconLeads, IconPhone, IconCheck, IconRupee } from '@/components/icons';
 import { formatMoney } from '@/lib/format';
 
 export default function DashboardPage() {
@@ -43,12 +44,31 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="New leads" value={summary?.newLeads ?? '—'} hint="last 30 days" />
-        <StatCard label="Total calls" value={summary?.totalCalls ?? '—'} />
-        <StatCard label="Converted" value={summary?.conversions ?? '—'} hint="to distributor" />
+        <StatCard
+          label="New leads"
+          value={summary?.newLeads ?? '—'}
+          hint="last 30 days"
+          icon={<IconLeads className="h-5 w-5" />}
+          tone="blue"
+        />
+        <StatCard
+          label="Total calls"
+          value={summary?.totalCalls ?? '—'}
+          icon={<IconPhone className="h-5 w-5" />}
+          tone="brand"
+        />
+        <StatCard
+          label="Converted"
+          value={summary?.conversions ?? '—'}
+          hint="to distributor"
+          icon={<IconCheck className="h-5 w-5" />}
+          tone="green"
+        />
         <StatCard
           label="Order value"
           value={summary ? formatMoney(summary.orderValue) : '—'}
+          icon={<IconRupee className="h-5 w-5" />}
+          tone="slate"
         />
       </div>
 

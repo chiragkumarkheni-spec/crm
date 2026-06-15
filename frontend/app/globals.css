@@ -1,26 +1,41 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  /* Brand: a warm Claude-style coral/terracotta — fits a lubricants brand. */
+  --color-brand-50: #fdf4ef;
+  --color-brand-100: #fae6db;
+  --color-brand-200: #f4cbb4;
+  --color-brand-300: #ecab8a;
+  --color-brand-400: #e08a63;
+  --color-brand-500: #d97757;
+  --color-brand-600: #c25c3c;
+  --color-brand-700: #9f4a2f;
+  --color-brand-800: #7f3c28;
+  --color-brand-900: #663223;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Warm neutral page background (cream paper). */
+  --color-canvas: #faf8f5;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Slim, modern scrollbars so dense tables/sidebars feel clean. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d6d3d1 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #d6d3d1;
+  border-radius: 9999px;
 }
