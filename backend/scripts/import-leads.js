@@ -17,6 +17,7 @@ const User = require('../src/models/User');
 
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry'); // preview only, writes nothing to the database
+const SET_CATALOGUE = args.includes('--catalogue'); // mark catalogue sent on every imported lead
 const file = args.find((a) => !a.startsWith('--'));
 if (!file) {
   console.error('Usage: node scripts/import-leads.js <path-to-xlsx> [--dry]');
@@ -135,6 +136,7 @@ function parseDate(raw) {
         assignedTo: owner._id,
         leadDate,
         status: 'new',
+        ...(SET_CATALOGUE ? { catalogue: { sent: true, date: new Date() } } : {}),
       });
     }
     imported++;
