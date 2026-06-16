@@ -15,6 +15,9 @@ function fmtDate(d: string) {
 
 export default function FollowUpsPage() {
   const { data, loading, refetch } = useApiData<Lead[]>('/api/leads/today-followups');
+  // New leads waiting (backlog) — count only, shown as a link, not an alert.
+  const { data: newData } = useApiData<{ total: number }>('/api/leads?status=new&limit=1');
+  const newCount = newData?.total ?? 0;
   // Re-check the clock every 15s (flip to "Call now" on time) and re-fetch every
   // 30s (pick up newly-scheduled follow-ups) without needing a manual refresh.
   const [nowTs, setNowTs] = useState(() => Date.now());
@@ -46,10 +49,22 @@ export default function FollowUpsPage() {
       <div>
         <h1 className="text-2xl font-bold">Today&apos;s follow-ups</h1>
         <p className="text-slate-500 text-sm">
-          A lead turns <span className="font-medium text-rose-600">🔴 Call now</span> at its scheduled
-          time. Open one to record the call.
+          Scheduled callbacks. A lead turns{' '}
+          <span className="font-medium text-rose-600">🔴 Call now</span> at its scheduled time.
         </p>
       </div>
+
+      {newCount > 0 && (
+        <Link
+          href="/leads"
+          className="flex items-center justify-between rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm transition-colors hover:bg-stone-50"
+        >
+          <span className="text-slate-600">
+            🆕 <strong>{newCount}</strong> new leads not yet called
+          </span>
+          <span className="font-medium text-brand-600">Open Leads →</span>
+        </Link>
+      )}
 
       {loading && leads.length === 0 ? (
         <p className="text-slate-500">Loading…</p>
