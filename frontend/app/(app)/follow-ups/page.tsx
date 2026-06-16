@@ -14,12 +14,18 @@ function fmtDate(d: string) {
 }
 
 export default function FollowUpsPage() {
+  // Scheduled callbacks (time-based reminders).
   const { data, loading, refetch } = useApiData<Lead[]>('/api/leads/today-followups');
-  // New leads waiting (backlog) — count only, shown as a link, not an alert.
-  const { data: newData } = useApiData<{ total: number }>('/api/leads?status=new&limit=1');
+  // New leads still to be called (the working backlog) — shown as a list, but
+  // NOT counted in the urgent "Call now" banner.
+  const { data: newData } = useApiData<{ items: Lead[]; total: number }>(
+    '/api/leads?status=new&limit=50'
+  );
+  const newLeads = newData?.items ?? [];
   const newCount = newData?.total ?? 0;
+
   // Re-check the clock every 15s (flip to "Call now" on time) and re-fetch every
-  // 30s (pick up newly-scheduled follow-ups) without needing a manual refresh.
+  // 30s (pick up newly-scheduled follow-ups) without a manual refresh.
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
     const tick = setInterval(() => setNowTs(Date.now()), 15000);
@@ -43,45 +49,32 @@ export default function FollowUpsPage() {
     );
 
   const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+  const nothingAtAll = dueNow.length === 0 && later.length === 0 && newCount === 0;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-bold">Today&apos;s follow-ups</h1>
         <p className="text-slate-500 text-sm">
-          Scheduled callbacks. A lead turns{' '}
-          <span className="font-medium text-rose-600">🔴 Call now</span> at its scheduled time.
+          Scheduled callbacks turn <span className="font-medium text-rose-600">🔴 Call now</span> at
+          their time. New leads to call are listed below.
         </p>
       </div>
 
-      {newCount > 0 && (
-        <Link
-          href="/leads"
-          className="flex items-center justify-between rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-sm transition-colors hover:bg-stone-50"
-        >
-          <span className="text-slate-600">
-            🆕 <strong>{newCount}</strong> new leads not yet called
-          </span>
-          <span className="font-medium text-brand-600">Open Leads →</span>
-        </Link>
-      )}
-
-      {loading && leads.length === 0 ? (
+      {loading && leads.length === 0 && newCount === 0 ? (
         <p className="text-slate-500">Loading…</p>
-      ) : leads.length === 0 ? (
+      ) : nothingAtAll ? (
         <Card>
-          <p className="text-slate-500">🎉 No follow-ups pending right now.</p>
+          <p className="text-slate-500">🎉 Sab leads ho gaye — abhi koi call pending nahi.</p>
         </Card>
       ) : (
         <>
-          {/* CALL NOW — urgent */}
+          {/* CALL NOW — urgent, scheduled */}
           <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold text-rose-600">
-              🔴 Call now ({dueNow.length})
-            </h2>
+            <h2 className="text-sm font-semibold text-rose-600">🔴 Call now ({dueNow.length})</h2>
             {dueNow.length === 0 ? (
               <Card>
-                <p className="text-sm text-slate-400">Nothing to call right now. 👍</p>
+                <p className="text-sm text-slate-400">Abhi koi urgent callback nahi. 👍</p>
               </Card>
             ) : (
               dueNow.map((lead) => {
@@ -100,15 +93,13 @@ export default function FollowUpsPage() {
                           </p>
                           <p className="text-sm text-slate-500">
                             {lead.state || '—'} · {lead.followUpCount} follow-ups ·{' '}
-                            {!lead.nextFollowUpDate ? (
-                              'new — first call pending'
-                            ) : overdue ? (
+                            {overdue ? (
                               <span className="font-medium text-rose-600">
-                                overdue (was {fmtDate(lead.nextFollowUpDate)})
+                                overdue (was {fmtDate(lead.nextFollowUpDate as string)})
                               </span>
                             ) : (
                               <span className="font-medium text-rose-600">
-                                due {fmtTime(lead.nextFollowUpDate)}
+                                due {fmtTime(lead.nextFollowUpDate as string)}
                               </span>
                             )}
                           </p>
@@ -153,6 +144,43 @@ export default function FollowUpsPage() {
                   </Card>
                 </Link>
               ))}
+            </div>
+          )}
+
+          {/* NEW LEADS TO CALL — the backlog (not urgent) */}
+          {newCount > 0 && (
+            <div className="flex flex-col gap-2">
+              <h2 className="text-sm font-semibold text-slate-500">
+                🆕 New leads to call ({newCount})
+              </h2>
+              {newLeads.map((lead) => (
+                <Link key={lead._id} href={`/leads/${lead._id}`}>
+                  <Card className="transition-colors hover:border-slate-400">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="font-medium">
+                          {lead.name || 'Unnamed'}{' '}
+                          <span className="text-slate-400">·</span>{' '}
+                          <span className="text-slate-600">{lead.mobileNumber}</span>
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          {lead.state || '—'}
+                          {lead.city ? ` · ${lead.city}` : ''} · first call pending
+                        </p>
+                      </div>
+                      <StatusBadge status={lead.status} />
+                    </div>
+                  </Card>
+                </Link>
+              ))}
+              {newCount > newLeads.length && (
+                <Link
+                  href="/leads"
+                  className="rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-center text-sm font-medium text-brand-600 transition-colors hover:bg-stone-50"
+                >
+                  + {newCount - newLeads.length} aur new leads — Open Leads →
+                </Link>
+              )}
             </div>
           )}
         </>
