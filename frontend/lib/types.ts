@@ -133,6 +133,17 @@ export interface ReportSummary {
   conversions: number;
   orderValue: number;
   cataloguesSent: number;
+  distributorCalls: number;
+}
+
+export interface DistributorCallDetail {
+  _id: string;
+  employee?: { _id: string; name?: string };
+  distributor?: { _id: string; name?: string; mobileNumber?: string; companyName?: string };
+  category: string;
+  direction: 'incoming' | 'outgoing';
+  note?: string;
+  date: string;
 }
 
 export interface EmployeeReportRow {
@@ -153,6 +164,7 @@ export interface EmployeeReportRow {
   in_progress: number;
   conversions: number;
   orderValue: number;
+  distributorCalls: number;
 }
 
 export const OUTCOME_LABELS: Record<Outcome, string> = {

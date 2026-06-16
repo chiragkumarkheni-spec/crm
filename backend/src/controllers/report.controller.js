@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const mongoose = require('mongoose');
 const Lead = require('../models/Lead');
 const FollowUp = require('../models/FollowUp');
+const DistributorCall = require('../models/DistributorCall');
 const { startOfDay, endOfDay } = require('../utils/date');
 
 const isAdmin = (user) => user.role === 'admin';
@@ -50,8 +51,14 @@ const summary = asyncHandler(async (req, res) => {
   else if (req.query.employee)
     catalogueMatch.assignedTo = new mongoose.Types.ObjectId(req.query.employee);
 
+  // Distributor calls in range (existing-distributor servicing — separate work).
+  const distMatch = { date: { $gte: from, $lte: to } };
+  if (!isAdmin(req.user)) distMatch.employee = req.user._id;
+  else if (req.query.employee)
+    distMatch.employee = new mongoose.Types.ObjectId(req.query.employee);
+
   // These run independently — in parallel instead of one-by-one.
-  const [outcomeAgg, convAgg, newLeads, cataloguesSent] = await Promise.all([
+  const [outcomeAgg, convAgg, newLeads, cataloguesSent, distributorCalls] = await Promise.all([
     FollowUp.aggregate([
       { $match: followMatch },
       { $group: { _id: '$outcome', count: { $sum: 1 } } },
@@ -68,6 +75,7 @@ const summary = asyncHandler(async (req, res) => {
     ]),
     Lead.countDocuments(newLeadMatch),
     Lead.countDocuments(catalogueMatch),
+    DistributorCall.countDocuments(distMatch),
   ]);
 
   const outcomes = {
@@ -96,6 +104,7 @@ const summary = asyncHandler(async (req, res) => {
     conversions,
     orderValue,
     cataloguesSent,
+    distributorCalls,
   });
 });
 
@@ -110,7 +119,7 @@ const byEmployee = asyncHandler(async (req, res) => {
   //  - calls/outcomes (follow-ups) within the selected period
   //  - conversions + order value (leads converted) within the period
   //  - lead INVENTORY per rep (all-time, status-wise: how many leads each holds)
-  const [calls, conv, leadInv] = await Promise.all([
+  const [calls, conv, leadInv, distCalls] = await Promise.all([
     FollowUp.aggregate([
       { $match: { date: { $gte: from, $lte: to } } },
       {
@@ -150,9 +159,14 @@ const byEmployee = asyncHandler(async (req, res) => {
         },
       },
     ]),
+    DistributorCall.aggregate([
+      { $match: { date: { $gte: from, $lte: to } } },
+      { $group: { _id: '$employee', distributorCalls: { $sum: 1 } } },
+    ]),
   ]);
   const convMap = new Map(conv.map((c) => [String(c._id), c]));
   const invMap = new Map(leadInv.map((c) => [String(c._id), c]));
+  const distMap = new Map(distCalls.map((c) => [String(c._id), c]));
 
   // The report is rep-wise: show every active EMPLOYEE (even with zero leads),
   // plus any lead owner. Admins are not reps, so they don't get a row.
@@ -198,6 +212,7 @@ const byEmployee = asyncHandler(async (req, res) => {
       in_progress: c.in_progress || 0,
       conversions: cv.conversions || 0,
       orderValue: cv.orderValue || 0,
+      distributorCalls: (distMap.get(id) || {}).distributorCalls || 0,
     };
   });
 
@@ -211,4 +226,25 @@ const byEmployee = asyncHandler(async (req, res) => {
   res.json({ range: { from, to }, rows });
 });
 
-module.exports = { summary, byEmployee };
+// ---------------------------------------------------------------------------
+// GET /api/reports/distributor-calls?from&to&employee
+//   Detailed list of distributor calls (for the "click to see detail" view).
+//   Rep: only their own; admin: all or one employee's.
+// ---------------------------------------------------------------------------
+const distributorCallList = asyncHandler(async (req, res) => {
+  const { from, to } = rangeFromQuery(req.query);
+  const filter = { date: { $gte: from, $lte: to } };
+  if (!isAdmin(req.user)) filter.employee = req.user._id;
+  else if (req.query.employee)
+    filter.employee = new mongoose.Types.ObjectId(req.query.employee);
+
+  const items = await DistributorCall.find(filter)
+    .populate('employee', 'name')
+    .populate('distributor', 'name mobileNumber companyName')
+    .sort({ date: -1 })
+    .limit(1000)
+    .lean();
+  res.json({ range: { from, to }, items });
+});
+
+module.exports = { summary, byEmployee, distributorCallList };
