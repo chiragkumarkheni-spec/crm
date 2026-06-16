@@ -42,6 +42,8 @@ export interface Lead {
   quantity?: string;
   requirement?: string;
   source?: string;
+  deleted?: boolean;
+  deletedAt?: string;
   createdBy?: User | string;
   assignedTo?: User | string;
   leadDate: string;

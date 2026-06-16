@@ -9,8 +9,10 @@ const {
   markSampleSent,
   recordSampleRequest,
   addFollowUp,
+  deleteLead,
+  restoreLead,
 } = require('../controllers/lead.controller');
-const { protect } = require('../middleware/auth');
+const { protect, adminOnly } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -24,5 +26,8 @@ router.post('/:id/catalogue', markCatalogueSent);
 router.post('/:id/sample', markSampleSent);
 router.post('/:id/sample-request', recordSampleRequest);
 router.post('/:id/followups', addFollowUp);
+// Lead delete/restore are ADMIN ONLY (reps can never delete a lead).
+router.delete('/:id', adminOnly, deleteLead);
+router.post('/:id/restore', adminOnly, restoreLead);
 
 module.exports = router;

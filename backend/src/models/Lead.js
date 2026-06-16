@@ -99,6 +99,13 @@ const leadSchema = new mongoose.Schema(
     },
 
     notes: { type: String, trim: true },
+
+    // --- Soft delete (admin-only) → Lead Recycle Bin ---
+    // A deleted lead is hidden from every list but never removed from the
+    // database. Only an admin can delete; from the bin it can only be restored,
+    // never permanently removed.
+    deleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date },
   },
   { timestamps: true }
 );

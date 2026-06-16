@@ -90,6 +90,10 @@ const listLeads = asyncHandler(async (req, res) => {
   } else if (employee) {
     filter.assignedTo = employee;
   }
+  // Recycle Bin: only an admin can list deleted leads; everyone else (and the
+  // admin's normal view) always excludes deleted leads.
+  const wantDeleted = isAdmin(req.user) && req.query.deleted === 'true';
+  filter.deleted = wantDeleted ? true : { $ne: true };
   if (status) filter.status = status;
   if (state) filter.state = state;
   if (from || to) {
@@ -111,7 +115,7 @@ const listLeads = asyncHandler(async (req, res) => {
     Lead.find(filter)
       .populate('assignedTo', 'name email')
       .populate('createdBy', 'name email')
-      .sort({ createdAt: -1 })
+      .sort(wantDeleted ? { deletedAt: -1 } : { createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean(),
@@ -127,6 +131,7 @@ const listLeads = asyncHandler(async (req, res) => {
 const todayFollowUps = asyncHandler(async (req, res) => {
   const filter = {
     status: { $nin: ['converted', 'lost'] },
+    deleted: { $ne: true },
     // Show a lead on the daily screen if it is due/overdue for a follow-up OR
     // it is a brand-new lead that has never been worked (no next date yet) —
     // those still need their first call today.
@@ -391,6 +396,38 @@ const addFollowUp = asyncHandler(async (req, res) => {
   res.status(201).json({ lead, followUp });
 });
 
+// ---------------------------------------------------------------------------
+// DELETE /api/leads/:id — admin-only soft delete → Lead Recycle Bin.
+// The lead is hidden everywhere but kept in the database; it can be restored
+// later but never permanently removed.
+// ---------------------------------------------------------------------------
+const deleteLead = asyncHandler(async (req, res) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) {
+    res.status(404);
+    throw new Error('Lead not found');
+  }
+  lead.deleted = true;
+  lead.deletedAt = new Date();
+  await lead.save();
+  res.json({ success: true, _id: lead._id });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/leads/:id/restore — admin-only restore from the Recycle Bin.
+// ---------------------------------------------------------------------------
+const restoreLead = asyncHandler(async (req, res) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) {
+    res.status(404);
+    throw new Error('Lead not found');
+  }
+  lead.deleted = false;
+  lead.deletedAt = undefined;
+  await lead.save();
+  res.json({ success: true, _id: lead._id });
+});
+
 module.exports = {
   createLead,
   listLeads,
@@ -401,4 +438,6 @@ module.exports = {
   markSampleSent,
   recordSampleRequest,
   addFollowUp,
+  deleteLead,
+  restoreLead,
 };

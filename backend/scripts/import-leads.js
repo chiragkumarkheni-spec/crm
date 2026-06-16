@@ -15,9 +15,11 @@ const connectDB = require('../src/config/db');
 const Lead = require('../src/models/Lead');
 const User = require('../src/models/User');
 
-const file = process.argv[2];
+const args = process.argv.slice(2);
+const DRY = args.includes('--dry'); // preview only, writes nothing to the database
+const file = args.find((a) => !a.startsWith('--'));
 if (!file) {
-  console.error('Usage: node scripts/import-leads.js <path-to-xlsx>');
+  console.error('Usage: node scripts/import-leads.js <path-to-xlsx> [--dry]');
   process.exit(1);
 }
 
@@ -32,16 +34,29 @@ function val(row, ...keys) {
 }
 
 // Clean an Indian mobile number without ever discarding the row.
+// Handles "+91", spaces, dashes, a leading 0/91, and cells that contain TWO
+// numbers (keeps the first valid 10-digit one and flags it for review).
+function normalizeGroup(g) {
+  let d = g.replace(/\D/g, '');
+  if (d.length === 12 && d.startsWith('91')) d = d.slice(2);
+  else if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
+  return d;
+}
 function cleanMobile(raw) {
   const original = String(raw == null ? '' : raw).trim();
   const hadLetters = /[a-zA-Z]/.test(original);
-  let digits = original.replace(/\D/g, '');
-  if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
-  else if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
-  const needsReview = hadLetters || digits.length !== 10;
-  // Store cleaned digits; if there were none, keep the original so nothing is lost.
-  const value = digits.length > 0 ? digits : original || '(missing)';
-  return { value, needsReview, original };
+  const groups = original.split(/[\s,;/|]+/).filter(Boolean).map(normalizeGroup).filter((d) => d.length > 0);
+  if (groups.length === 0) {
+    return { value: original || '(missing)', needsReview: true, original };
+  }
+  if (groups.length === 1) {
+    const d = groups[0];
+    const needsReview = hadLetters || d.length !== 10;
+    return { value: d, needsReview, original };
+  }
+  // Two or more numbers in one cell — KEEP BOTH (separated by " / ") and flag it,
+  // so neither contact is lost and the admin can review.
+  return { value: groups.join(' / '), needsReview: true, original };
 }
 
 function parseDate(raw) {
@@ -102,29 +117,31 @@ function parseDate(raw) {
 
     const leadDate = parseDate(val(r, 'Lead Date (optional, DD-MM-YYYY)', 'Lead Date')) || new Date();
 
-    await Lead.create({
-      name,
-      companyName: val(r, 'Company Name'),
-      mobileNumber: m.value,
-      mobileNeedsReview: m.needsReview,
-      email: val(r, 'Email'),
-      city: val(r, 'City'),
-      address: val(r, 'Address'),
-      state: val(r, 'State'),
-      product: val(r, 'Product Required'),
-      quantity: val(r, 'Quantity'),
-      requirement: val(r, 'Requirement / Message'),
-      source: val(r, 'Source') || 'IndiaMart',
-      createdBy: (admin && admin._id) || owner._id,
-      assignedTo: owner._id,
-      leadDate,
-      status: 'new',
-    });
+    if (!DRY) {
+      await Lead.create({
+        name,
+        companyName: val(r, 'Company Name'),
+        mobileNumber: m.value,
+        mobileNeedsReview: m.needsReview,
+        email: val(r, 'Email'),
+        city: val(r, 'City'),
+        address: val(r, 'Address'),
+        state: val(r, 'State'),
+        product: val(r, 'Product Required'),
+        quantity: val(r, 'Quantity'),
+        requirement: val(r, 'Requirement / Message'),
+        source: val(r, 'Source') || 'IndiaMart',
+        createdBy: (admin && admin._id) || owner._id,
+        assignedTo: owner._id,
+        leadDate,
+        status: 'new',
+      });
+    }
     imported++;
   }
 
-  console.log('\n========== IMPORT COMPLETE ==========');
-  console.log(`✅ Imported leads:        ${imported}`);
+  console.log(`\n========== ${DRY ? 'DRY RUN (nothing saved)' : 'IMPORT COMPLETE'} ==========`);
+  console.log(`${DRY ? 'Would import' : '✅ Imported'} leads:    ${imported}`);
   console.log(`⏭  Skipped (no name):     ${skipped.length}`);
   console.log(`⚠️  Mobile needs review:   ${mobileWarnings.length}`);
   console.log(`⚠️  Rep email not matched: ${repWarnings.length}  (these went to Admin — reassign later)`);

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useApiData } from '@/lib/useApiData';
 import type { Lead, LeadStatus } from '@/lib/types';
 import { STATUS_LABELS } from '@/lib/types';
@@ -25,33 +26,89 @@ const STATES = [
 ];
 
 export default function LeadsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [tab, setTab] = useState<'active' | 'bin'>('active');
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
 
+  const inBin = isAdmin && tab === 'bin';
+
   const params = new URLSearchParams();
   if (statusFilter) params.set('status', statusFilter);
   if (search) params.set('search', search);
+  if (inBin) params.set('deleted', 'true');
   const { data, refetch: load } = useApiData<LeadsResponse>(
     `/api/leads?${params.toString()}`
   );
+
+  async function del(lead: Lead) {
+    if (
+      !confirm(
+        `Delete lead "${lead.name || 'Unnamed'}"? It moves to the Recycle Bin — you can restore it later, but it can never be permanently deleted.`
+      )
+    ) {
+      return;
+    }
+    await api.delete(`/api/leads/${lead._id}`);
+    load();
+  }
+
+  async function restore(lead: Lead) {
+    await api.post(`/api/leads/${lead._id}/restore`);
+    load();
+  }
+
+  const colCount = isAdmin ? 9 : 8;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Leads</h1>
-        <Button onClick={() => setShowForm((s) => !s)}>
-          {showForm ? 'Close' : '+ Add lead'}
-        </Button>
+        {!inBin && (
+          <Button onClick={() => setShowForm((s) => !s)}>
+            {showForm ? 'Close' : '+ Add lead'}
+          </Button>
+        )}
       </div>
 
-      {showForm && (
+      {/* Admin-only tabs: Leads vs Recycle Bin */}
+      {isAdmin && (
+        <div className="flex w-fit gap-1 rounded-xl bg-stone-100 p-1">
+          <button
+            onClick={() => setTab('active')}
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+              tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Leads
+          </button>
+          <button
+            onClick={() => setTab('bin')}
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+              tab === 'bin' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            🗑 Recycle Bin
+          </button>
+        </div>
+      )}
+
+      {!inBin && showForm && (
         <AddLeadForm
           onCreated={() => {
             setShowForm(false);
             load();
           }}
         />
+      )}
+
+      {inBin && (
+        <p className="text-sm text-slate-500">
+          Deleted leads are kept here safely and can be restored anytime. For data
+          safety, they can never be permanently removed.
+        </p>
       )}
 
       <Card className="flex flex-wrap gap-3 items-end">
@@ -78,13 +135,13 @@ export default function LeadsPage() {
           </select>
         </Field>
         <span className="text-sm text-slate-500 ml-auto">
-          {data ? `${data.total} leads` : ''}
+          {data ? `${data.total} ${inBin ? 'in bin' : 'leads'}` : ''}
         </span>
       </Card>
 
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-500">
+          <thead className="bg-stone-50 text-left text-slate-500">
             <tr>
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Company</th>
@@ -93,12 +150,13 @@ export default function LeadsPage() {
               <th className="px-4 py-3 font-medium">State</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Next follow-up</th>
-              <th className="px-4 py-3 font-medium">Added</th>
+              <th className="px-4 py-3 font-medium">{inBin ? 'Deleted' : 'Added'}</th>
+              {isAdmin && <th className="px-4 py-3 font-medium"></th>}
             </tr>
           </thead>
           <tbody>
             {data?.items.map((lead) => (
-              <tr key={lead._id} className="border-t border-slate-100 hover:bg-slate-50">
+              <tr key={lead._id} className="border-t border-stone-100 hover:bg-stone-50">
                 <td className="px-4 py-3">
                   <Link href={`/leads/${lead._id}`} className="font-medium text-slate-900 hover:underline">
                     {lead.name || 'Unnamed'}
@@ -122,13 +180,30 @@ export default function LeadsPage() {
                 <td className="px-4 py-3 text-slate-600">{lead.state || '—'}</td>
                 <td className="px-4 py-3"><StatusBadge status={lead.status} /></td>
                 <td className="px-4 py-3 text-slate-600">{formatDate(lead.nextFollowUpDate)}</td>
-                <td className="px-4 py-3 text-slate-600">{formatDate(lead.leadDate)}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  {formatDate(inBin ? lead.deletedAt : lead.leadDate)}
+                </td>
+                {isAdmin && (
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end">
+                      {inBin ? (
+                        <Button variant="secondary" onClick={() => restore(lead)}>
+                          ↩ Restore
+                        </Button>
+                      ) : (
+                        <Button variant="danger" onClick={() => del(lead)}>
+                          Delete
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
             {data && data.items.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
-                  No leads found.
+                <td colSpan={colCount} className="px-4 py-8 text-center text-slate-500">
+                  {inBin ? 'Recycle Bin is empty.' : 'No leads found.'}
                 </td>
               </tr>
             )}
