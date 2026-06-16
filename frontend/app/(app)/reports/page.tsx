@@ -49,9 +49,10 @@ export default function ReportsPage() {
         </span>
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <StatCard label="New leads" value={summary?.newLeads ?? '—'} />
         <StatCard label="Total calls" value={summary?.totalCalls ?? '—'} />
+        <StatCard label="Catalogue sent" value={summary?.cataloguesSent ?? '—'} hint="all-time" />
         <StatCard label="Converted" value={summary?.conversions ?? '—'} hint="distributors" />
         <StatCard label="Order value" value={summary ? formatMoney(summary.orderValue) : '—'} />
       </div>
@@ -88,6 +89,7 @@ export default function ReportsPage() {
                 <th className="px-3 py-3 font-medium">In progress</th>
                 <th className="px-3 py-3 font-medium">Converted</th>
                 <th className="px-3 py-3 font-medium">Lost</th>
+                <th className="px-3 py-3 font-medium">Catalogue</th>
                 <th className="px-3 py-3 font-medium">Calls</th>
                 <th className="px-3 py-3 font-medium">Order value</th>
                 <th className="px-3 py-3 font-medium"></th>
@@ -104,6 +106,7 @@ export default function ReportsPage() {
                   <td className="px-3 py-3 text-blue-700">{r.leadsInProgress}</td>
                   <td className="px-3 py-3 font-medium text-green-700">{r.leadsConverted}</td>
                   <td className="px-3 py-3 text-rose-600">{r.leadsLost}</td>
+                  <td className="px-3 py-3 text-slate-600">{r.cataloguesSent}</td>
                   <td className="px-3 py-3 text-slate-600">{r.totalCalls}</td>
                   <td className="px-3 py-3">{formatMoney(r.orderValue)}</td>
                   <td className="px-3 py-3">
@@ -118,7 +121,7 @@ export default function ReportsPage() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                     No reps with leads or activity yet.
                   </td>
                 </tr>

@@ -44,8 +44,14 @@ const summary = asyncHandler(async (req, res) => {
   else if (req.query.employee)
     newLeadMatch.assignedTo = new mongoose.Types.ObjectId(req.query.employee);
 
-  // These three are independent — run them in parallel instead of one-by-one.
-  const [outcomeAgg, convAgg, newLeads] = await Promise.all([
+  // Catalogues sent (all-time count of leads marked catalogue-sent).
+  const catalogueMatch = { 'catalogue.sent': true, deleted: { $ne: true } };
+  if (!isAdmin(req.user)) catalogueMatch.assignedTo = req.user._id;
+  else if (req.query.employee)
+    catalogueMatch.assignedTo = new mongoose.Types.ObjectId(req.query.employee);
+
+  // These run independently — in parallel instead of one-by-one.
+  const [outcomeAgg, convAgg, newLeads, cataloguesSent] = await Promise.all([
     FollowUp.aggregate([
       { $match: followMatch },
       { $group: { _id: '$outcome', count: { $sum: 1 } } },
@@ -61,6 +67,7 @@ const summary = asyncHandler(async (req, res) => {
       },
     ]),
     Lead.countDocuments(newLeadMatch),
+    Lead.countDocuments(catalogueMatch),
   ]);
 
   const outcomes = {
@@ -88,6 +95,7 @@ const summary = asyncHandler(async (req, res) => {
     outcomes,
     conversions,
     orderValue,
+    cataloguesSent,
   });
 });
 
@@ -138,6 +146,7 @@ const byEmployee = asyncHandler(async (req, res) => {
           leadsInProgress: { $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] } },
           leadsConverted: { $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] } },
           leadsLost: { $sum: { $cond: [{ $eq: ['$status', 'lost'] }, 1, 0] } },
+          cataloguesSent: { $sum: { $cond: [{ $eq: ['$catalogue.sent', true] }, 1, 0] } },
         },
       },
     ]),
@@ -179,6 +188,7 @@ const byEmployee = asyncHandler(async (req, res) => {
       leadsInProgress: inv.leadsInProgress || 0,
       leadsConverted: inv.leadsConverted || 0,
       leadsLost: inv.leadsLost || 0,
+      cataloguesSent: inv.cataloguesSent || 0,
       // Activity (selected period)
       totalCalls: c.totalCalls || 0,
       no_pickup: c.no_pickup || 0,

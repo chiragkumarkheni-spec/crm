@@ -94,6 +94,7 @@ export interface ReportSummary {
   outcomes: Record<Outcome, number>;
   conversions: number;
   orderValue: number;
+  cataloguesSent: number;
 }
 
 export interface EmployeeReportRow {
@@ -104,6 +105,7 @@ export interface EmployeeReportRow {
   leadsInProgress: number;
   leadsConverted: number;
   leadsLost: number;
+  cataloguesSent: number;
   // Activity (selected period)
   totalCalls: number;
   no_pickup: number;
