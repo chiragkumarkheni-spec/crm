@@ -25,6 +25,8 @@ const distributorCallSchema = new mongoose.Schema(
     category: { type: String, enum: CATEGORIES, required: true },
     direction: { type: String, enum: ['incoming', 'outgoing'], default: 'incoming' },
     note: { type: String, trim: true },
+    // Order amount the distributor placed during this call (0 if none).
+    orderValue: { type: Number, default: 0 },
     date: { type: Date, default: Date.now },
   },
   { timestamps: true }

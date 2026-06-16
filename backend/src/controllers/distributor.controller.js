@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Distributor = require('../models/Distributor');
 const DistributorCall = require('../models/DistributorCall');
 const { logActivity } = require('../utils/activity');
+const { endOfDay } = require('../utils/date');
 
 const isAdmin = (user) => user.role === 'admin';
 
@@ -108,29 +109,56 @@ const addDistributorCall = asyncHandler(async (req, res) => {
     res.status(403);
     throw new Error('Not your distributor');
   }
-  const { category, note, direction } = req.body;
+  const { category, note, direction, orderValue, nextFollowUpDate } = req.body;
   if (!category) {
     res.status(400);
     throw new Error('Please choose a reason for the call.');
   }
+  const amount = Number(orderValue) > 0 ? Number(orderValue) : 0;
   const call = await DistributorCall.create({
     distributor: distributor._id,
     employee: req.user._id,
     category,
     direction: direction === 'outgoing' ? 'outgoing' : 'incoming',
     note: note ? String(note).trim() : '',
+    orderValue: amount,
     date: new Date(),
   });
   distributor.lastCallAt = new Date();
   distributor.callCount = (distributor.callCount || 0) + 1;
+  distributor.totalOrderValue = (distributor.totalOrderValue || 0) + amount;
+  // Schedule the next distributor follow-up (separate from the lead pipeline).
+  if (nextFollowUpDate) {
+    distributor.nextFollowUpDate = new Date(nextFollowUpDate);
+    distributor.followUpCount = (distributor.followUpCount || 0) + 1;
+  }
   await distributor.save();
   await logActivity({
     user: req.user,
     action: 'distributor_call',
     leadName: distributor.name,
-    detail: `${category.replace(/_/g, ' ')}${note ? ' · ' + note : ''}`,
+    detail:
+      `${category.replace(/_/g, ' ')}` +
+      `${amount ? ` · ₹${amount}` : ''}` +
+      `${note ? ' · ' + note : ''}`,
   });
   res.status(201).json(call);
+});
+
+// GET /api/distributors/today-followups — distributors due for a follow-up
+// today or overdue (their OWN pipeline, separate from leads).
+const distributorFollowUps = asyncHandler(async (req, res) => {
+  const filter = {
+    deleted: { $ne: true },
+    nextFollowUpDate: { $exists: true, $ne: null, $lte: endOfDay() },
+  };
+  if (!isAdmin(req.user)) filter.assignedTo = req.user._id;
+  else if (req.query.employee) filter.assignedTo = req.query.employee;
+  const items = await Distributor.find(filter)
+    .populate('assignedTo', 'name')
+    .sort({ nextFollowUpDate: 1 })
+    .lean();
+  res.json(items);
 });
 
 module.exports = {
@@ -138,4 +166,5 @@ module.exports = {
   listDistributors,
   getDistributor,
   addDistributorCall,
+  distributorFollowUps,
 };

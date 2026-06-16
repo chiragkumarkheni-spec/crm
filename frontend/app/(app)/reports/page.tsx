@@ -62,6 +62,13 @@ export default function ReportsPage() {
             hint="click for detail →"
           />
         </Link>
+        <Link href="/distributor-calls" className="block">
+          <StatCard
+            label="Distributor orders"
+            value={summary ? formatMoney(summary.distributorOrderValue) : '—'}
+            hint="click for detail →"
+          />
+        </Link>
       </div>
 
       {summary && (
@@ -99,6 +106,7 @@ export default function ReportsPage() {
                 <th className="px-3 py-3 font-medium">Catalogue</th>
                 <th className="px-3 py-3 font-medium">Calls</th>
                 <th className="px-3 py-3 font-medium">Distr. calls</th>
+                <th className="px-3 py-3 font-medium">Distr. orders</th>
                 <th className="px-3 py-3 font-medium">Order value</th>
                 <th className="px-3 py-3 font-medium"></th>
               </tr>
@@ -124,6 +132,7 @@ export default function ReportsPage() {
                       {r.distributorCalls}
                     </Link>
                   </td>
+                  <td className="px-3 py-3 text-green-700">{formatMoney(r.distributorOrderValue)}</td>
                   <td className="px-3 py-3">{formatMoney(r.orderValue)}</td>
                   <td className="px-3 py-3">
                     <Link
@@ -137,7 +146,7 @@ export default function ReportsPage() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={12} className="px-4 py-8 text-center text-slate-500">
                     No reps with leads or activity yet.
                   </td>
                 </tr>

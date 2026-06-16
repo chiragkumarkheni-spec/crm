@@ -19,6 +19,11 @@ const distributorSchema = new mongoose.Schema(
 
     callCount: { type: Number, default: 0 },
     lastCallAt: { type: Date },
+    // Running total of all order amounts placed by this distributor.
+    totalOrderValue: { type: Number, default: 0 },
+    // Distributor follow-up pipeline — SEPARATE from leads.
+    nextFollowUpDate: { type: Date, index: true },
+    followUpCount: { type: Number, default: 0 },
 
     deleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date },

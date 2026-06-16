@@ -57,7 +57,7 @@ const summary = asyncHandler(async (req, res) => {
     distMatch.employee = new mongoose.Types.ObjectId(req.query.employee);
 
   // These run independently — in parallel instead of one-by-one.
-  const [outcomeAgg, convAgg, newLeads, cataloguesSent, distributorCalls] = await Promise.all([
+  const [outcomeAgg, convAgg, newLeads, cataloguesSent, distAgg] = await Promise.all([
     FollowUp.aggregate([
       { $match: followMatch },
       { $group: { _id: '$outcome', count: { $sum: 1 } } },
@@ -74,8 +74,13 @@ const summary = asyncHandler(async (req, res) => {
     ]),
     Lead.countDocuments(newLeadMatch),
     Lead.countDocuments(catalogueMatch),
-    DistributorCall.countDocuments(distMatch),
+    DistributorCall.aggregate([
+      { $match: distMatch },
+      { $group: { _id: null, count: { $sum: 1 }, orderValue: { $sum: '$orderValue' } } },
+    ]),
   ]);
+  const distributorCalls = distAgg[0]?.count || 0;
+  const distributorOrderValue = distAgg[0]?.orderValue || 0;
 
   const outcomes = {
     in_progress: 0,
@@ -104,6 +109,7 @@ const summary = asyncHandler(async (req, res) => {
     orderValue,
     cataloguesSent,
     distributorCalls,
+    distributorOrderValue,
   });
 });
 
@@ -160,7 +166,13 @@ const byEmployee = asyncHandler(async (req, res) => {
     ]),
     DistributorCall.aggregate([
       { $match: { date: { $gte: from, $lte: to } } },
-      { $group: { _id: '$employee', distributorCalls: { $sum: 1 } } },
+      {
+        $group: {
+          _id: '$employee',
+          distributorCalls: { $sum: 1 },
+          distributorOrderValue: { $sum: '$orderValue' },
+        },
+      },
     ]),
   ]);
   const convMap = new Map(conv.map((c) => [String(c._id), c]));
@@ -212,6 +224,7 @@ const byEmployee = asyncHandler(async (req, res) => {
       conversions: cv.conversions || 0,
       orderValue: cv.orderValue || 0,
       distributorCalls: (distMap.get(id) || {}).distributorCalls || 0,
+      distributorOrderValue: (distMap.get(id) || {}).distributorOrderValue || 0,
     };
   });
 

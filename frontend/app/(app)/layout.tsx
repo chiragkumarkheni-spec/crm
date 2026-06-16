@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useApiData } from '@/lib/useApiData';
-import type { Lead } from '@/lib/types';
+import type { Lead, Distributor } from '@/lib/types';
 import {
   IconDashboard,
   IconFollowUps,
@@ -23,6 +23,7 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
   showDue?: boolean;
+  showDistDue?: boolean;
 };
 
 const NAV: NavItem[] = [
@@ -30,6 +31,7 @@ const NAV: NavItem[] = [
   { href: '/follow-ups', label: "Today's Follow-ups", icon: IconFollowUps, showDue: true },
   { href: '/leads', label: 'Leads', icon: IconLeads },
   { href: '/distributors', label: 'Distributors', icon: IconDistributors },
+  { href: '/distributor-followups', label: 'Distr. Follow-ups', icon: IconFollowUps, showDistDue: true },
   { href: '/reports', label: 'Reports', icon: IconReports },
   { href: '/activity', label: 'Activity', icon: IconActivity },
   { href: '/admin', label: 'Admin', icon: IconAdmin, adminOnly: true },
@@ -43,20 +45,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // (so newly-scheduled follow-ups are picked up) and re-check the clock every
   // 15s (so a lead flips to "due" the moment its time arrives) — on EVERY page.
   const { data: dueLeads, refetch } = useApiData<Lead[]>('/api/leads/today-followups');
+  const { data: dueDists, refetch: refetchDist } = useApiData<Distributor[]>(
+    '/api/distributors/today-followups'
+  );
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
     const tick = setInterval(() => setNowTs(Date.now()), 15000);
-    const poll = setInterval(() => refetch(), 30000);
+    const poll = setInterval(() => {
+      refetch();
+      refetchDist();
+    }, 30000);
     return () => {
       clearInterval(tick);
       clearInterval(poll);
     };
-  }, [refetch]);
+  }, [refetch, refetchDist]);
   const dueNowLeads = (dueLeads ?? []).filter(
     (l) => !l.nextFollowUpDate || new Date(l.nextFollowUpDate).getTime() <= nowTs
   );
   const dueCount = dueNowLeads.length;
   const firstDueName = dueNowLeads[0]?.name || 'a lead';
+  const distDueCount = (dueDists ?? []).filter(
+    (d) => d.nextFollowUpDate && new Date(d.nextFollowUpDate).getTime() <= nowTs
+  ).length;
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -119,9 +130,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   }`}
                 />
                 <span className="flex-1 truncate">{n.label}</span>
-                {n.showDue && dueCount > 0 && (
+                {((n.showDue && dueCount > 0) || (n.showDistDue && distDueCount > 0)) && (
                   <span className="grid min-w-5 place-items-center rounded-full bg-brand-500 px-1.5 py-0.5 text-xs font-bold text-white">
-                    {dueCount}
+                    {n.showDistDue ? distDueCount : dueCount}
                   </span>
                 )}
               </Link>
@@ -199,9 +210,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 >
                   <Icon className="h-4 w-4" />
                   {n.label}
-                  {n.showDue && dueCount > 0 && (
+                  {((n.showDue && dueCount > 0) || (n.showDistDue && distDueCount > 0)) && (
                     <span className="grid min-w-4 place-items-center rounded-full bg-brand-500 px-1 text-xs font-bold text-white">
-                      {dueCount}
+                      {n.showDistDue ? distDueCount : dueCount}
                     </span>
                   )}
                 </Link>

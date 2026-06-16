@@ -87,6 +87,9 @@ export interface Distributor {
   assignedTo?: User | string;
   callCount?: number;
   lastCallAt?: string;
+  totalOrderValue?: number;
+  nextFollowUpDate?: string;
+  followUpCount?: number;
   createdAt: string;
 }
 
@@ -97,6 +100,7 @@ export interface DistributorCall {
   category: string;
   direction: 'incoming' | 'outgoing';
   note?: string;
+  orderValue?: number;
   date: string;
   createdAt: string;
 }
@@ -136,6 +140,7 @@ export interface ReportSummary {
   orderValue: number;
   cataloguesSent: number;
   distributorCalls: number;
+  distributorOrderValue: number;
 }
 
 export interface DistributorCallDetail {
@@ -145,6 +150,7 @@ export interface DistributorCallDetail {
   category: string;
   direction: 'incoming' | 'outgoing';
   note?: string;
+  orderValue?: number;
   date: string;
 }
 
@@ -167,6 +173,7 @@ export interface EmployeeReportRow {
   conversions: number;
   orderValue: number;
   distributorCalls: number;
+  distributorOrderValue: number;
 }
 
 export const OUTCOME_LABELS: Record<Outcome, string> = {

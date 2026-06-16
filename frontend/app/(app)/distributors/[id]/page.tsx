@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import type { Distributor, DistributorCall, User } from '@/lib/types';
 import { DISTRIBUTOR_CATEGORIES } from '@/lib/types';
 import { Card, Button, Field, inputClass } from '@/components/ui';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatMoney, todayISO } from '@/lib/format';
 
 export default function DistributorDetailPage() {
   const params = useParams<{ id: string }>();
@@ -56,6 +56,25 @@ export default function DistributorDetailPage() {
         </span>
       </div>
 
+      {/* Quick stats: total orders, calls, next follow-up */}
+      <Card className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+        <span>
+          <span className="text-slate-400">Total orders:</span>{' '}
+          <strong className="text-green-700">{formatMoney(distributor.totalOrderValue || 0)}</strong>
+        </span>
+        <span>
+          <span className="text-slate-400">Calls:</span> {distributor.callCount || 0}
+        </span>
+        <span>
+          <span className="text-slate-400">Next follow-up:</span>{' '}
+          {distributor.nextFollowUpDate ? (
+            <strong className="text-rose-600">{formatDateTime(distributor.nextFollowUpDate)}</strong>
+          ) : (
+            <span className="text-slate-400">— none</span>
+          )}
+        </span>
+      </Card>
+
       <LogCallForm distributorId={id} onSaved={load} />
 
       <div>
@@ -73,6 +92,11 @@ export default function DistributorDetailPage() {
                   </span>
                   <span className="text-xs text-slate-400">{formatDateTime(c.date)}</span>
                 </div>
+                {!!c.orderValue && (
+                  <p className="text-sm font-medium text-green-700">
+                    💰 Order: {formatMoney(c.orderValue)}
+                  </p>
+                )}
                 {c.note && <p className="text-sm text-slate-700">{c.note}</p>}
                 {typeof c.employee === 'object' && (
                   <p className="text-xs text-slate-400">by {(c.employee as User).name}</p>
@@ -89,19 +113,42 @@ export default function DistributorDetailPage() {
 function LogCallForm({ distributorId, onSaved }: { distributorId: string; onSaved: () => void }) {
   const [category, setCategory] = useState('new_order');
   const [direction, setDirection] = useState<'incoming' | 'outgoing'>('incoming');
+  const [orderValue, setOrderValue] = useState('');
   const [note, setNote] = useState('');
+  const [nextDate, setNextDate] = useState('');
+  const [nextTime, setNextTime] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const isSameDay = !!nextDate && nextDate === todayISO();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    if (isSameDay && !nextTime) {
+      setError('Aaj ka follow-up hai — time daalna zaroori hai (e.g. 3:00 PM).');
+      return;
+    }
+    let nextISO: string | undefined;
+    if (nextDate) {
+      const dt = new Date(`${nextDate}T${nextTime || '09:00'}`);
+      nextISO = isNaN(dt.getTime()) ? undefined : dt.toISOString();
+    }
     setSaving(true);
     try {
-      await api.post(`/api/distributors/${distributorId}/calls`, { category, direction, note });
+      await api.post(`/api/distributors/${distributorId}/calls`, {
+        category,
+        direction,
+        note,
+        orderValue: orderValue ? Number(orderValue) : 0,
+        nextFollowUpDate: nextISO,
+      });
       setNote('');
+      setOrderValue('');
       setCategory('new_order');
       setDirection('incoming');
+      setNextDate('');
+      setNextTime('');
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to log call');
@@ -137,6 +184,16 @@ function LogCallForm({ distributorId, onSaved }: { distributorId: string; onSave
               <option value="outgoing">Outgoing (humne call kiya)</option>
             </select>
           </Field>
+          <Field label="Order value (₹) — agar order diya">
+            <input
+              type="number"
+              min="0"
+              className={inputClass}
+              value={orderValue}
+              onChange={(e) => setOrderValue(e.target.value)}
+              placeholder="0"
+            />
+          </Field>
         </div>
         <Field label="Note (optional)">
           <textarea
@@ -147,6 +204,28 @@ function LogCallForm({ distributorId, onSaved }: { distributorId: string; onSave
             placeholder="e.g. 500 ltr ka naya order; payment 15 din me."
           />
         </Field>
+
+        {/* Next distributor follow-up (separate from leads) */}
+        <div className="rounded-lg border border-stone-200 bg-stone-50/60 p-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Next follow-up (optional)
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Date">
+              <input type="date" className={inputClass} value={nextDate} onChange={(e) => setNextDate(e.target.value)} />
+            </Field>
+            <Field label={isSameDay ? 'Time * (today needs a time)' : 'Time (optional)'}>
+              <input
+                type="time"
+                className={inputClass}
+                required={isSameDay}
+                value={nextTime}
+                onChange={(e) => setNextTime(e.target.value)}
+              />
+            </Field>
+          </div>
+        </div>
+
         <div>
           <Button type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Log call'}

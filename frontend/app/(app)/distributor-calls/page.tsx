@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import type { DistributorCallDetail } from '@/lib/types';
 import { DISTRIBUTOR_CATEGORIES } from '@/lib/types';
 import { Card, Field, inputClass } from '@/components/ui';
-import { formatDateTime, todayISO } from '@/lib/format';
+import { formatDateTime, formatMoney, todayISO } from '@/lib/format';
 
 export default function DistributorCallsPage() {
   const { user } = useAuth();
@@ -76,6 +76,7 @@ export default function DistributorCallsPage() {
               <th className="px-4 py-3 font-medium">Date</th>
               <th className="px-4 py-3 font-medium">Distributor</th>
               <th className="px-4 py-3 font-medium">Reason</th>
+              <th className="px-4 py-3 font-medium">Order ₹</th>
               <th className="px-4 py-3 font-medium">Type</th>
               <th className="px-4 py-3 font-medium">Note</th>
               {isAdmin && <th className="px-4 py-3 font-medium">Rep</th>}
@@ -102,6 +103,9 @@ export default function DistributorCallsPage() {
                     {DISTRIBUTOR_CATEGORIES[c.category] || c.category}
                   </span>
                 </td>
+                <td className="px-4 py-3 font-medium text-green-700">
+                  {c.orderValue ? formatMoney(c.orderValue) : '—'}
+                </td>
                 <td className="px-4 py-3 text-slate-600">{c.direction}</td>
                 <td className="px-4 py-3 text-slate-600">{c.note || '—'}</td>
                 {isAdmin && <td className="px-4 py-3 font-medium text-slate-700">{c.employee?.name || '—'}</td>}
@@ -109,7 +113,7 @@ export default function DistributorCallsPage() {
             ))}
             {data && items.length === 0 && (
               <tr>
-                <td colSpan={isAdmin ? 6 : 5} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-500">
                   Is range me koi distributor call nahi.
                 </td>
               </tr>
