@@ -47,6 +47,13 @@ function normalizeGroup(g) {
 function cleanMobile(raw) {
   const original = String(raw == null ? '' : raw).trim();
   const hadLetters = /[a-zA-Z]/.test(original);
+  // First treat the whole cell as ONE number (strip spaces/dashes/+91). A single
+  // 10-digit number with stray spaces (e.g. "81477 35549") is the common case.
+  const whole = normalizeGroup(original);
+  if (whole.length === 10 && !hadLetters) {
+    return { value: whole, needsReview: false, original };
+  }
+  // Otherwise split into separate number groups.
   const groups = original.split(/[\s,;/|]+/).filter(Boolean).map(normalizeGroup).filter((d) => d.length > 0);
   if (groups.length === 0) {
     return { value: original || '(missing)', needsReview: true, original };
@@ -56,8 +63,8 @@ function cleanMobile(raw) {
     const needsReview = hadLetters || d.length !== 10;
     return { value: d, needsReview, original };
   }
-  // Two or more numbers in one cell — KEEP BOTH (separated by " / ") and flag it,
-  // so neither contact is lost and the admin can review.
+  // Two or more genuine numbers in one cell — KEEP BOTH (separated by " / ") and
+  // flag it, so neither contact is lost and the admin can review.
   return { value: groups.join(' / '), needsReview: true, original };
 }
 
