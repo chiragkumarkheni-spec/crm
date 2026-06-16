@@ -14,13 +14,18 @@ function fmtDate(d: string) {
 }
 
 export default function FollowUpsPage() {
-  const { data, loading } = useApiData<Lead[]>('/api/leads/today-followups');
-  // Re-evaluate every 30s so a lead flips to "Call now" the moment its time hits.
+  const { data, loading, refetch } = useApiData<Lead[]>('/api/leads/today-followups');
+  // Re-check the clock every 15s (flip to "Call now" on time) and re-fetch every
+  // 30s (pick up newly-scheduled follow-ups) without needing a manual refresh.
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNowTs(Date.now()), 30000);
-    return () => clearInterval(t);
-  }, []);
+    const tick = setInterval(() => setNowTs(Date.now()), 15000);
+    const poll = setInterval(() => refetch(), 30000);
+    return () => {
+      clearInterval(tick);
+      clearInterval(poll);
+    };
+  }, [refetch]);
 
   const leads = data ?? [];
   const dueNow = leads.filter(

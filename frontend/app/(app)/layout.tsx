@@ -35,17 +35,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  // Shared (cached) follow-up list → badge shows how many need calling RIGHT NOW
-  // (new leads + anything whose scheduled time has arrived). Re-checked every 30s.
-  const { data: dueLeads } = useApiData<Lead[]>('/api/leads/today-followups');
+  // Follow-up list drives the global "Call now" reminder. We RE-FETCH every 30s
+  // (so newly-scheduled follow-ups are picked up) and re-check the clock every
+  // 15s (so a lead flips to "due" the moment its time arrives) — on EVERY page.
+  const { data: dueLeads, refetch } = useApiData<Lead[]>('/api/leads/today-followups');
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNowTs(Date.now()), 30000);
-    return () => clearInterval(t);
-  }, []);
-  const dueCount = (dueLeads ?? []).filter(
+    const tick = setInterval(() => setNowTs(Date.now()), 15000);
+    const poll = setInterval(() => refetch(), 30000);
+    return () => {
+      clearInterval(tick);
+      clearInterval(poll);
+    };
+  }, [refetch]);
+  const dueNowLeads = (dueLeads ?? []).filter(
     (l) => !l.nextFollowUpDate || new Date(l.nextFollowUpDate).getTime() <= nowTs
-  ).length;
+  );
+  const dueCount = dueNowLeads.length;
+  const firstDueName = dueNowLeads[0]?.name || 'a lead';
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -140,6 +147,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* ---- Main column ---- */}
       <div className="flex flex-1 flex-col min-w-0">
+        {/* Global "Call now" reminder — shows on every page when a follow-up is due */}
+        {dueCount > 0 && pathname !== '/follow-ups' && (
+          <Link
+            href="/follow-ups"
+            className="sticky top-0 z-30 flex items-center justify-center gap-2 bg-rose-600 px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+          >
+            <span className="inline-block h-2.5 w-2.5 animate-ping rounded-full bg-white" />
+            🔴 {dueCount} lead{dueCount > 1 ? 's' : ''} ko abhi call karna hai
+            <span className="font-normal opacity-90">
+              — {firstDueName}
+              {dueCount > 1 ? ` +${dueCount - 1} aur` : ''}
+            </span>
+            <span className="underline underline-offset-2">Dekho →</span>
+          </Link>
+        )}
+
         {/* Mobile top bar + nav */}
         <header className="lg:hidden sticky top-0 z-10 border-b border-stone-200 bg-white/90 backdrop-blur">
           <div className="flex items-center justify-between px-4 h-14">
