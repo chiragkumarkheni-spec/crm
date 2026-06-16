@@ -31,14 +31,32 @@ export default function LeadsPage() {
   const [tab, setTab] = useState<'active' | 'bin'>('active');
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
 
   const inBin = isAdmin && tab === 'bin';
+  const PER_PAGE = 50;
+
+  // Any filter change should jump back to page 1.
+  function changeSearch(v: string) {
+    setSearch(v);
+    setPage(1);
+  }
+  function changeStatus(v: string) {
+    setStatusFilter(v);
+    setPage(1);
+  }
+  function changeTab(t: 'active' | 'bin') {
+    setTab(t);
+    setPage(1);
+  }
 
   const params = new URLSearchParams();
   if (statusFilter) params.set('status', statusFilter);
   if (search) params.set('search', search);
   if (inBin) params.set('deleted', 'true');
+  params.set('page', String(page));
+  params.set('limit', String(PER_PAGE));
   const { data, refetch: load } = useApiData<LeadsResponse>(
     `/api/leads?${params.toString()}`
   );
@@ -77,7 +95,7 @@ export default function LeadsPage() {
       {isAdmin && (
         <div className="flex w-fit gap-1 rounded-xl bg-stone-100 p-1">
           <button
-            onClick={() => setTab('active')}
+            onClick={() => changeTab('active')}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
               tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
@@ -85,7 +103,7 @@ export default function LeadsPage() {
             Leads
           </button>
           <button
-            onClick={() => setTab('bin')}
+            onClick={() => changeTab('bin')}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
               tab === 'bin' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
             }`}
@@ -116,7 +134,7 @@ export default function LeadsPage() {
           <input
             className={inputClass}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => changeSearch(e.target.value)}
             placeholder="Type mobile number, name or company…"
           />
         </Field>
@@ -124,7 +142,7 @@ export default function LeadsPage() {
           <select
             className={inputClass}
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => changeStatus(e.target.value)}
           >
             <option value="">All</option>
             {(Object.keys(STATUS_LABELS) as LeadStatus[]).map((s) => (
@@ -210,6 +228,33 @@ export default function LeadsPage() {
           </tbody>
         </table>
       </Card>
+
+      {/* Pagination — 50 per page */}
+      {data && data.total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm text-slate-500">
+            Showing {(data.page - 1) * PER_PAGE + 1}–
+            {Math.min(data.page * PER_PAGE, data.total)} of {data.total}
+            {' · '}Page {data.page} of {data.pages}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              ← Previous
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={page >= data.pages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next →
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
