@@ -61,6 +61,17 @@ export interface Lead {
   createdAt: string;
 }
 
+export interface Activity {
+  _id: string;
+  user: string;
+  userName?: string;
+  action: string;
+  lead?: string;
+  leadName?: string;
+  detail?: string;
+  createdAt: string;
+}
+
 export interface FollowUp {
   _id: string;
   lead: string;

@@ -12,6 +12,7 @@ import {
   IconLeads,
   IconReports,
   IconAdmin,
+  IconActivity,
   IconLogout,
 } from '@/components/icons';
 
@@ -28,6 +29,7 @@ const NAV: NavItem[] = [
   { href: '/follow-ups', label: "Today's Follow-ups", icon: IconFollowUps, showDue: true },
   { href: '/leads', label: 'Leads', icon: IconLeads },
   { href: '/reports', label: 'Reports', icon: IconReports },
+  { href: '/activity', label: 'Activity', icon: IconActivity },
   { href: '/admin', label: 'Admin', icon: IconAdmin, adminOnly: true },
 ];
 

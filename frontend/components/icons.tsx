@@ -89,6 +89,16 @@ export function IconRupee({ className }: IconProps) {
   );
 }
 
+export function IconActivity({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="M12 8v4l3 2" />
+      <path d="M3.05 11a9 9 0 1 1 .5 4" />
+      <polyline points="3 21 3 15 9 15" />
+    </svg>
+  );
+}
+
 export function IconLogout({ className }: IconProps) {
   return (
     <svg {...base(className)}>

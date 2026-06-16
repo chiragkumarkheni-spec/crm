@@ -9,6 +9,7 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const leadRoutes = require('./routes/lead.routes');
 const reportRoutes = require('./routes/report.routes');
+const activityRoutes = require('./routes/activity.routes');
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/activity', activityRoutes);
 
 // --- Errors ---
 app.use(notFound);

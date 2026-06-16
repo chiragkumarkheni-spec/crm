@@ -3,6 +3,7 @@ const Lead = require('../models/Lead');
 const FollowUp = require('../models/FollowUp');
 const { startOfDay, endOfDay, isToday } = require('../utils/date');
 const { sendIntroMessage } = require('../services/whatsapp');
+const { logActivity } = require('../utils/activity');
 
 const isAdmin = (user) => user.role === 'admin';
 
@@ -83,6 +84,7 @@ const createLead = asyncHandler(async (req, res) => {
     status: 'new',
   });
 
+  await logActivity({ user: req.user, action: 'lead_created', lead, detail: lead.mobileNumber });
   res.status(201).json(lead);
 });
 
@@ -222,6 +224,7 @@ const updateLead = asyncHandler(async (req, res) => {
   // Admin may reassign.
   if (isAdmin(req.user) && req.body.assignedTo) lead.assignedTo = req.body.assignedTo;
   await lead.save();
+  await logActivity({ user: req.user, action: 'lead_edited', lead });
   res.json(lead);
 });
 
@@ -240,6 +243,7 @@ const markCatalogueSent = asyncHandler(async (req, res) => {
   }
   lead.catalogue = { sent: true, date: new Date() };
   await lead.save();
+  await logActivity({ user: req.user, action: 'catalogue_sent', lead });
   res.json(lead);
 });
 
@@ -262,6 +266,7 @@ const markSampleSent = asyncHandler(async (req, res) => {
     description: req.body.description || lead.sampleRequest?.description || '',
   };
   await lead.save();
+  await logActivity({ user: req.user, action: 'sample_sent', lead, detail: lead.sample.description });
   res.json(lead);
 });
 
@@ -305,6 +310,7 @@ const recordSampleRequest = asyncHandler(async (req, res) => {
     date: new Date(),
   };
   await lead.save();
+  await logActivity({ user: req.user, action: 'sample_request', lead, detail: lead.sampleRequest.description });
   res.json(lead);
 });
 
@@ -402,6 +408,17 @@ const addFollowUp = asyncHandler(async (req, res) => {
   }
   await lead.save();
 
+  let detail = outcome.replace(/_/g, ' ');
+  if (outcome === 'converted') detail = `converted · ₹${Number(orderValue)}`;
+  else if (nextFollowUpDate)
+    detail += ` · next ${new Date(nextFollowUpDate).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`;
+  await logActivity({ user: req.user, action: 'followup', lead, detail });
+
   res.status(201).json({ lead, followUp });
 });
 
@@ -419,6 +436,7 @@ const deleteLead = asyncHandler(async (req, res) => {
   lead.deleted = true;
   lead.deletedAt = new Date();
   await lead.save();
+  await logActivity({ user: req.user, action: 'lead_deleted', lead });
   res.json({ success: true, _id: lead._id });
 });
 
@@ -434,6 +452,7 @@ const restoreLead = asyncHandler(async (req, res) => {
   lead.deleted = false;
   lead.deletedAt = undefined;
   await lead.save();
+  await logActivity({ user: req.user, action: 'lead_restored', lead });
   res.json({ success: true, _id: lead._id });
 });
 
