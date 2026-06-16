@@ -48,6 +48,8 @@ export interface Lead {
   assignedTo?: User | string;
   leadDate: string;
   status: LeadStatus;
+  strong?: boolean;
+  strongAt?: string;
   nextFollowUpDate?: string;
   followUpCount: number;
   lastFollowUpAt?: string;

@@ -16,6 +16,8 @@ const META: Record<string, { icon: string; verb: string; color: string }> = {
   sample_request: { icon: '📝', verb: 'noted sample request for', color: 'text-slate-700' },
   distributor_call: { icon: '🤝', verb: 'distributor call with', color: 'text-green-700' },
   distributor_added: { icon: '🏪', verb: 'added distributor', color: 'text-green-700' },
+  lead_strong: { icon: '⭐', verb: 'marked strong', color: 'text-amber-700' },
+  lead_unstrong: { icon: '☆', verb: 'unmarked strong', color: 'text-slate-600' },
 };
 
 function fmt(d: string) {

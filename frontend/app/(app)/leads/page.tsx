@@ -28,7 +28,7 @@ const STATES = [
 export default function LeadsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const [tab, setTab] = useState<'active' | 'bin'>('active');
+  const [tab, setTab] = useState<'active' | 'strong' | 'bin'>('active');
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -62,7 +62,7 @@ export default function LeadsPage() {
     setStatusFilter(v);
     setPage(1);
   }
-  function changeTab(t: 'active' | 'bin') {
+  function changeTab(t: 'active' | 'strong' | 'bin') {
     setTab(t);
     setPage(1);
   }
@@ -71,6 +71,7 @@ export default function LeadsPage() {
   if (statusFilter) params.set('status', statusFilter);
   if (search) params.set('search', search);
   if (inBin) params.set('deleted', 'true');
+  if (tab === 'strong') params.set('strong', 'true');
   if (isAdmin && employeeId) params.set('employee', employeeId);
   params.set('page', String(page));
   params.set('limit', String(PER_PAGE));
@@ -126,17 +127,25 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {/* Admin-only tabs: Leads vs Recycle Bin */}
-      {isAdmin && (
-        <div className="flex w-fit gap-1 rounded-xl bg-stone-100 p-1">
-          <button
-            onClick={() => changeTab('active')}
-            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
-              tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Leads
-          </button>
+      {/* Tabs: All leads / Strong (everyone) + Recycle Bin (admin) */}
+      <div className="flex w-fit gap-1 rounded-xl bg-stone-100 p-1">
+        <button
+          onClick={() => changeTab('active')}
+          className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+            tab === 'active' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          All leads
+        </button>
+        <button
+          onClick={() => changeTab('strong')}
+          className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+            tab === 'strong' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          ⭐ Strong leads
+        </button>
+        {isAdmin && (
           <button
             onClick={() => changeTab('bin')}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
@@ -145,8 +154,8 @@ export default function LeadsPage() {
           >
             🗑 Recycle Bin
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {!inBin && showForm && (
         <AddLeadForm
@@ -213,6 +222,11 @@ export default function LeadsPage() {
               <tr key={lead._id} className="border-t border-stone-100 hover:bg-stone-50">
                 <td className="px-4 py-3">
                   <Link href={`/leads/${lead._id}`} className="font-medium text-slate-900 hover:underline">
+                    {lead.strong && (
+                      <span title="Strong lead" className="mr-1 text-amber-500">
+                        ⭐
+                      </span>
+                    )}
                     {lead.name || 'Unnamed'}
                   </Link>
                 </td>
@@ -260,7 +274,11 @@ export default function LeadsPage() {
             {data && data.items.length === 0 && (
               <tr>
                 <td colSpan={colCount} className="px-4 py-8 text-center text-slate-500">
-                  {inBin ? 'Recycle Bin is empty.' : 'No leads found.'}
+                  {inBin
+                    ? 'Recycle Bin is empty.'
+                    : tab === 'strong'
+                    ? 'No strong leads yet — kisi lead ko kholke "⭐ Mark as strong lead" karo.'
+                    : 'No leads found.'}
                 </td>
               </tr>
             )}

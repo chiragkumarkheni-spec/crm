@@ -107,6 +107,7 @@ const listLeads = asyncHandler(async (req, res) => {
   // admin's normal view) always excludes deleted leads.
   const wantDeleted = isAdmin(req.user) && req.query.deleted === 'true';
   filter.deleted = wantDeleted ? true : { $ne: true };
+  if (req.query.strong === 'true') filter.strong = true; // Strong-leads filter
   if (status) filter.status = status;
   if (state) filter.state = state;
   if (from || to) {
@@ -456,6 +457,35 @@ const restoreLead = asyncHandler(async (req, res) => {
   res.json({ success: true, _id: lead._id });
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/leads/:id/strong — mark / unmark a lead as a STRONG lead.
+// Allowed anytime by the owner (or admin) — not subject to the edit-time window.
+// ---------------------------------------------------------------------------
+const setStrong = asyncHandler(async (req, res) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) {
+    res.status(404);
+    throw new Error('Lead not found');
+  }
+  const owns =
+    lead.assignedTo.toString() === req.user._id.toString() ||
+    lead.createdBy.toString() === req.user._id.toString();
+  if (!isAdmin(req.user) && !owns) {
+    res.status(403);
+    throw new Error('Not your lead');
+  }
+  const strong = req.body.strong !== false; // default true
+  lead.strong = strong;
+  lead.strongAt = strong ? new Date() : undefined;
+  await lead.save();
+  await logActivity({
+    user: req.user,
+    action: strong ? 'lead_strong' : 'lead_unstrong',
+    lead,
+  });
+  res.json(lead);
+});
+
 module.exports = {
   createLead,
   listLeads,
@@ -468,4 +498,5 @@ module.exports = {
   addFollowUp,
   deleteLead,
   restoreLead,
+  setStrong,
 };

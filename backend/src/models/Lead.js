@@ -62,6 +62,9 @@ const leadSchema = new mongoose.Schema(
 
     // --- Pipeline state ---
     status: { type: String, enum: LEAD_STATUSES, default: 'new', index: true },
+    // Marked by a rep as a high-potential lead (strong business chance).
+    strong: { type: Boolean, default: false, index: true },
+    strongAt: { type: Date },
     nextFollowUpDate: { type: Date, index: true },
     followUpCount: { type: Number, default: 0 },
     lastFollowUpAt: { type: Date },

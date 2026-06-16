@@ -58,9 +58,27 @@ export default function LeadDetailPage() {
     (Date.now() - new Date(lead.createdAt).getTime()) / 3600000;
   const canEdit = hrsSinceCreate <= editWindowHrs; // reps only ever see their own leads
   const hoursLeft = Math.max(0, Math.ceil(editWindowHrs - hrsSinceCreate));
+  const isStrong = !!lead.strong;
+
+  async function toggleStrong() {
+    await api.post(`/api/leads/${id}/strong`, { strong: !isStrong });
+    load();
+  }
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Strong-lead highlight banner */}
+      {isStrong && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+          <span className="flex items-center gap-2 text-sm font-bold text-amber-800">
+            ⭐ STRONG LEAD — high business potential
+          </span>
+          <button onClick={toggleStrong} className="text-xs font-medium text-amber-700 hover:underline">
+            Unmark
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -81,6 +99,14 @@ export default function LeadDetailPage() {
         </div>
         <div className="text-right flex flex-col items-end gap-2">
           <StatusBadge status={lead.status} />
+          {!isStrong && (
+            <button
+              onClick={toggleStrong}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-amber-600"
+            >
+              ⭐ Mark as strong lead
+            </button>
+          )}
           {lead.status === 'converted' && (
             <span className="text-sm font-medium text-green-700">
               Order: {formatMoney(lead.order.value, lead.order.currency)}
