@@ -22,7 +22,7 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold">Welcome, {user?.name}</h1>
           <p className="text-slate-500 text-sm">
             {summary
-              ? `Last 30 days · ${summary.newLeads} new leads · ${summary.totalCalls} calls`
+              ? `Aaj · ${summary.newLeads} new leads · ${summary.totalCalls} calls`
               : 'Loading your numbers…'}
           </p>
         </div>
@@ -47,7 +47,7 @@ export default function DashboardPage() {
         <StatCard
           label="New leads"
           value={summary?.newLeads ?? '—'}
-          hint="last 30 days"
+          hint="today"
           icon={<IconLeads className="h-5 w-5" />}
           tone="blue"
         />
@@ -74,7 +74,7 @@ export default function DashboardPage() {
 
       {summary && (
         <Card>
-          <h2 className="font-semibold mb-3">Call outcomes (last 30 days)</h2>
+          <h2 className="font-semibold mb-3">Call outcomes (today)</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
             {(
               Object.keys(OUTCOME_LABELS) as (keyof typeof OUTCOME_LABELS)[]

@@ -45,7 +45,7 @@ export default function ReportsPage() {
           <input type="date" className={inputClass} value={to} onChange={(e) => setTo(e.target.value)} />
         </Field>
         <span className="text-xs text-slate-400">
-          Default range is the last 30 days.
+          Default: aaj ka (daily). Month/range chahiye to From–To date daalo.
         </span>
       </Card>
 

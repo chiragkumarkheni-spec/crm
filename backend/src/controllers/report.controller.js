@@ -8,11 +8,10 @@ const { startOfDay, endOfDay } = require('../utils/date');
 const isAdmin = (user) => user.role === 'admin';
 
 function rangeFromQuery(q) {
+  // Default range is TODAY (a daily report). Pass ?from&to to widen it to a
+  // month or any custom range.
   const to = q.to ? endOfDay(new Date(q.to)) : endOfDay();
-  // default range: last 30 days
-  const defaultFrom = new Date();
-  defaultFrom.setDate(defaultFrom.getDate() - 29);
-  const from = q.from ? startOfDay(new Date(q.from)) : startOfDay(defaultFrom);
+  const from = q.from ? startOfDay(new Date(q.from)) : startOfDay();
   return { from, to };
 }
 
