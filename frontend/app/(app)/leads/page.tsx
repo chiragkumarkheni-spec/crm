@@ -105,7 +105,19 @@ export default function LeadsPage() {
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-slate-600">{lead.companyName || '—'}</td>
-                <td className="px-4 py-3 text-slate-600">{lead.mobileNumber}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  <span className="inline-flex items-center gap-1">
+                    {lead.mobileNumber}
+                    {lead.mobileNeedsReview && (
+                      <span
+                        title="This number looks unusual — please check/fix it"
+                        className="rounded bg-amber-100 px-1 text-xs font-medium text-amber-700"
+                      >
+                        ⚠ check
+                      </span>
+                    )}
+                  </span>
+                </td>
                 <td className="px-4 py-3 text-slate-600">{lead.product || '—'}</td>
                 <td className="px-4 py-3 text-slate-600">{lead.state || '—'}</td>
                 <td className="px-4 py-3"><StatusBadge status={lead.status} /></td>

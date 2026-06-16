@@ -23,12 +23,17 @@ const leadSchema = new mongoose.Schema(
       trim: true,
     }, // buyer / contact person name
     companyName: { type: String, trim: true }, // firm / company name
+    // Required, but the "exactly 10 digits" rule is enforced for MANUAL entry
+    // (frontend + createLead controller). Bulk import is intentionally lenient —
+    // odd numbers are still saved (and flagged) so no contact is ever lost.
     mobileNumber: {
       type: String,
       required: [true, 'Mobile number is required'],
       trim: true,
-      match: [/^\d{10}$/, 'Mobile number must be exactly 10 digits'],
     },
+    // Set on import when the mobile number looked unusual (not a clean 10 digits)
+    // so the admin can review/fix it without losing the lead.
+    mobileNeedsReview: { type: Boolean, default: false },
     email: { type: String, trim: true, lowercase: true },
     address: { type: String, trim: true },
     city: { type: String, trim: true },

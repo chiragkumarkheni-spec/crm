@@ -33,6 +33,7 @@ export interface Lead {
   name?: string;
   companyName?: string;
   mobileNumber: string;
+  mobileNeedsReview?: boolean;
   email?: string;
   address?: string;
   city?: string;
