@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useApiData } from '@/lib/useApiData';
-import type { Lead, LeadStatus } from '@/lib/types';
+import type { Lead, LeadStatus, User } from '@/lib/types';
 import { STATUS_LABELS } from '@/lib/types';
 import { Card, Button, Field, inputClass, StatusBadge } from '@/components/ui';
 import { formatDate } from '@/lib/format';
@@ -95,7 +95,11 @@ export default function LeadsPage() {
     load();
   }
 
-  const colCount = isAdmin ? 9 : 8;
+  const colCount = isAdmin ? 10 : 8;
+  const repName = (lead: Lead) =>
+    typeof lead.assignedTo === 'object' && lead.assignedTo
+      ? (lead.assignedTo as User).name || (lead.assignedTo as User).email
+      : '—';
 
   return (
     <div className="flex flex-col gap-4">
@@ -194,6 +198,7 @@ export default function LeadsPage() {
             <tr>
               <th className="px-4 py-3 font-medium">Name</th>
               <th className="px-4 py-3 font-medium">Company</th>
+              {isAdmin && <th className="px-4 py-3 font-medium">Rep</th>}
               <th className="px-4 py-3 font-medium">Mobile</th>
               <th className="px-4 py-3 font-medium">Product</th>
               <th className="px-4 py-3 font-medium">State</th>
@@ -212,6 +217,9 @@ export default function LeadsPage() {
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-slate-600">{lead.companyName || '—'}</td>
+                {isAdmin && (
+                  <td className="px-4 py-3 font-medium text-slate-700">{repName(lead)}</td>
+                )}
                 <td className="px-4 py-3 text-slate-600">
                   <span className="inline-flex items-center gap-1">
                     {lead.mobileNumber}
