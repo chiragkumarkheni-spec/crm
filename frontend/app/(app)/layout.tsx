@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
@@ -35,9 +35,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  // Shared (cached) due-today count so the Follow-ups tab can show a live badge.
+  // Shared (cached) follow-up list → badge shows how many need calling RIGHT NOW
+  // (new leads + anything whose scheduled time has arrived). Re-checked every 30s.
   const { data: dueLeads } = useApiData<Lead[]>('/api/leads/today-followups');
-  const dueCount = dueLeads?.length ?? 0;
+  const [nowTs, setNowTs] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowTs(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+  const dueCount = (dueLeads ?? []).filter(
+    (l) => !l.nextFollowUpDate || new Date(l.nextFollowUpDate).getTime() <= nowTs
+  ).length;
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login');

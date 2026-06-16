@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import type { Lead, FollowUp, Outcome, User } from '@/lib/types';
 import { OUTCOME_LABELS } from '@/lib/types';
 import { Card, Button, Field, inputClass, StatusBadge } from '@/components/ui';
-import { formatDate, formatDateTime, formatMoney } from '@/lib/format';
+import { formatDate, formatDateTime, formatMoney, todayISO } from '@/lib/format';
 
 // True if the given date string falls on the user's current calendar day.
 function isSameDay(dateStr?: string): boolean {
@@ -362,23 +362,43 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
   const [outcome, setOutcome] = useState<Outcome>('in_progress');
   const [development, setDevelopment] = useState('');
   const [nextFollowUpDate, setNextFollowUpDate] = useState('');
+  const [nextFollowUpTime, setNextFollowUpTime] = useState('');
   const [orderValue, setOrderValue] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const isSameDay = !!nextFollowUpDate && nextFollowUpDate === todayISO();
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    // Same-day follow-up MUST have a time (so it pops up as "urgent" at that time).
+    // Future-day follow-ups don't need a time.
+    if (outcome !== 'converted' && isSameDay && !nextFollowUpTime) {
+      setError('Aaj ka follow-up hai — time daalna zaroori hai (e.g. 3:00 PM).');
+      return;
+    }
+
+    // Combine date + time into a full datetime. Future days with no time default
+    // to 9:00 AM so the lead surfaces that morning.
+    let nextISO: string | undefined;
+    if (outcome !== 'converted' && nextFollowUpDate) {
+      const dt = new Date(`${nextFollowUpDate}T${nextFollowUpTime || '09:00'}`);
+      nextISO = isNaN(dt.getTime()) ? undefined : dt.toISOString();
+    }
+
     setSaving(true);
     try {
       await api.post(`/api/leads/${leadId}/followups`, {
         outcome,
         development,
-        nextFollowUpDate: nextFollowUpDate || undefined,
+        nextFollowUpDate: nextISO,
         orderValue: outcome === 'converted' ? Number(orderValue) : undefined,
       });
       setDevelopment('');
       setNextFollowUpDate('');
+      setNextFollowUpTime('');
       setOrderValue('');
       setOutcome('in_progress');
       onSaved();
@@ -408,7 +428,7 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
               ))}
             </select>
           </Field>
-          {outcome === 'converted' ? (
+          {outcome === 'converted' && (
             <Field label="Order value (₹) *">
               <input
                 type="number"
@@ -419,7 +439,11 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
                 onChange={(e) => setOrderValue(e.target.value)}
               />
             </Field>
-          ) : (
+          )}
+        </div>
+
+        {outcome !== 'converted' && (
+          <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Next follow-up date">
               <input
                 type="date"
@@ -428,8 +452,23 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
                 onChange={(e) => setNextFollowUpDate(e.target.value)}
               />
             </Field>
-          )}
-        </div>
+            <Field label={isSameDay ? 'Time * (today needs a time)' : 'Time (optional)'}>
+              <input
+                type="time"
+                className={inputClass}
+                required={isSameDay}
+                value={nextFollowUpTime}
+                onChange={(e) => setNextFollowUpTime(e.target.value)}
+              />
+            </Field>
+          </div>
+        )}
+        {isSameDay && (
+          <p className="-mt-1 text-xs text-amber-600">
+            Aaj ka follow-up hai — time zaroori. Us time pe yeh lead{' '}
+            <strong>🔴 Call now</strong> me aa jaayegi.
+          </p>
+        )}
         <Field label="Development (what happened) *">
           <textarea
             className={inputClass}
