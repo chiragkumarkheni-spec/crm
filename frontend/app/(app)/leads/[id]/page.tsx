@@ -29,6 +29,7 @@ export default function LeadDetailPage() {
   const [lead, setLead] = useState<Lead | null>(null);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
 
   const load = useCallback(() => {
     api
@@ -50,6 +51,13 @@ export default function LeadDetailPage() {
   const assignedName =
     typeof lead.assignedTo === 'object' ? (lead.assignedTo as User).name : '';
   const isClosed = lead.status === 'converted' || lead.status === 'lost';
+
+  // Edit window: rep can edit for 36h after creation, admin for 100h, then nobody.
+  const editWindowHrs = user?.role === 'admin' ? 100 : 36;
+  const hrsSinceCreate =
+    (Date.now() - new Date(lead.createdAt).getTime()) / 3600000;
+  const canEdit = hrsSinceCreate <= editWindowHrs; // reps only ever see their own leads
+  const hoursLeft = Math.max(0, Math.ceil(editWindowHrs - hrsSinceCreate));
 
   return (
     <div className="flex flex-col gap-6">
@@ -78,8 +86,28 @@ export default function LeadDetailPage() {
               Order: {formatMoney(lead.order.value, lead.order.currency)}
             </span>
           )}
+          {canEdit ? (
+            <div className="flex flex-col items-end gap-1">
+              <Button variant="secondary" onClick={() => setEditing((e) => !e)}>
+                {editing ? 'Close edit' : '✏ Edit lead'}
+              </Button>
+              <span className="text-xs text-slate-400">Editable for ~{hoursLeft}h more</span>
+            </div>
+          ) : (
+            <span className="text-xs text-slate-400">🔒 Edit window closed</span>
+          )}
         </div>
       </div>
+
+      {editing && canEdit && (
+        <LeadEditForm
+          lead={lead}
+          onSaved={() => {
+            setEditing(false);
+            load();
+          }}
+        />
+      )}
 
       {/* Requirement / enquiry detail */}
       {(lead.product || lead.quantity || lead.requirement) && (
@@ -415,6 +443,91 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
         <div>
           <Button type="submit" disabled={saving}>
             {saving ? 'Saving…' : 'Save follow-up'}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+function LeadEditForm({ lead, onSaved }: { lead: Lead; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    name: lead.name || '',
+    companyName: lead.companyName || '',
+    mobileNumber: lead.mobileNumber || '',
+    email: lead.email || '',
+    city: lead.city || '',
+    state: lead.state || '',
+    address: lead.address || '',
+    product: lead.product || '',
+    quantity: lead.quantity || '',
+    requirement: lead.requirement || '',
+    source: lead.source || '',
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  function set(k: string, v: string) {
+    setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      await api.patch(`/api/leads/${lead._id}`, form);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save changes');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const fields: [string, string][] = [
+    ['Buyer name *', 'name'],
+    ['Company / firm', 'companyName'],
+    ['Mobile number *', 'mobileNumber'],
+    ['Email', 'email'],
+    ['City', 'city'],
+    ['State', 'state'],
+    ['Address', 'address'],
+    ['Product required', 'product'],
+    ['Quantity', 'quantity'],
+    ['Source', 'source'],
+  ];
+
+  return (
+    <Card>
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <h2 className="font-semibold">Edit lead</h2>
+        {error && (
+          <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
+        )}
+        <div className="grid sm:grid-cols-2 gap-4">
+          {fields.map(([label, key]) => (
+            <Field key={key} label={label}>
+              <input
+                className={inputClass}
+                required={label.includes('*')}
+                value={(form as Record<string, string>)[key]}
+                onChange={(e) => set(key, e.target.value)}
+              />
+            </Field>
+          ))}
+        </div>
+        <Field label="Requirement / message">
+          <textarea
+            className={inputClass}
+            rows={2}
+            value={form.requirement}
+            onChange={(e) => set('requirement', e.target.value)}
+          />
+        </Field>
+        <div>
+          <Button type="submit" disabled={saving}>
+            {saving ? 'Saving…' : 'Save changes'}
           </Button>
         </div>
       </form>

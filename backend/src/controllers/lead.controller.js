@@ -6,14 +6,25 @@ const { sendIntroMessage } = require('../services/whatsapp');
 
 const isAdmin = (user) => user.role === 'admin';
 
-// Can this user still edit this lead? Admin: always. Employee: only on the
-// same day the lead was created (the "edit today's work only" rule).
+// Lead edit windows, measured from when the lead was created:
+//   - the rep who owns the lead can edit it for 36 hours
+//   - an admin can edit it for 100 hours
+//   - after that nobody can edit it
+const REP_EDIT_HOURS = 36;
+const ADMIN_EDIT_HOURS = 100;
+
+function hoursSince(date) {
+  return (Date.now() - new Date(date).getTime()) / 3600000;
+}
+
+// Can this user still edit this lead?
 function canEditLead(user, lead) {
-  if (isAdmin(user)) return true;
+  const hrs = hoursSince(lead.createdAt || lead.leadDate);
+  if (isAdmin(user)) return hrs <= ADMIN_EDIT_HOURS;
   const owns =
     lead.assignedTo.toString() === user._id.toString() ||
     lead.createdBy.toString() === user._id.toString();
-  return owns && isToday(lead.leadDate);
+  return owns && hrs <= REP_EDIT_HOURS;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +201,9 @@ const updateLead = asyncHandler(async (req, res) => {
   if (!canEditLead(req.user, lead)) {
     res.status(403);
     throw new Error(
-      'This lead can no longer be edited (only same-day edits are allowed)'
+      isAdmin(req.user)
+        ? 'This lead can no longer be edited (the 100-hour admin edit window has passed)'
+        : 'This lead can no longer be edited (the 36-hour edit window has passed)'
     );
   }
   const editable = [
