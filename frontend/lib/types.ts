@@ -87,6 +87,13 @@ export interface ReportSummary {
 
 export interface EmployeeReportRow {
   employee: { _id: string; name?: string; email?: string };
+  // Lead inventory (all-time)
+  leadsTotal: number;
+  leadsNew: number;
+  leadsInProgress: number;
+  leadsConverted: number;
+  leadsLost: number;
+  // Activity (selected period)
   totalCalls: number;
   no_pickup: number;
   high_rate: number;

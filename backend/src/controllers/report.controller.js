@@ -98,9 +98,11 @@ const summary = asyncHandler(async (req, res) => {
 const byEmployee = asyncHandler(async (req, res) => {
   const { from, to } = rangeFromQuery(req.query);
 
-  // Calls/outcomes and conversions are independent — run both aggregations
-  // in parallel.
-  const [calls, conv] = await Promise.all([
+  // Three independent aggregations run in parallel:
+  //  - calls/outcomes (follow-ups) within the selected period
+  //  - conversions + order value (leads converted) within the period
+  //  - lead INVENTORY per rep (all-time, status-wise: how many leads each holds)
+  const [calls, conv, leadInv] = await Promise.all([
     FollowUp.aggregate([
       { $match: { date: { $gte: from, $lte: to } } },
       {
@@ -126,13 +128,28 @@ const byEmployee = asyncHandler(async (req, res) => {
         },
       },
     ]),
+    Lead.aggregate([
+      { $match: { deleted: { $ne: true } } },
+      {
+        $group: {
+          _id: '$assignedTo',
+          leadsTotal: { $sum: 1 },
+          leadsNew: { $sum: { $cond: [{ $eq: ['$status', 'new'] }, 1, 0] } },
+          leadsInProgress: { $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] } },
+          leadsConverted: { $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] } },
+          leadsLost: { $sum: { $cond: [{ $eq: ['$status', 'lost'] }, 1, 0] } },
+        },
+      },
+    ]),
   ]);
   const convMap = new Map(conv.map((c) => [String(c._id), c]));
+  const invMap = new Map(leadInv.map((c) => [String(c._id), c]));
 
-  // Merge, attach user names.
+  // Merge, attach user names. A rep appears if they have leads OR activity.
   const ids = new Set([
     ...calls.map((c) => String(c._id)),
     ...conv.map((c) => String(c._id)),
+    ...leadInv.map((c) => String(c._id)),
   ]);
   const User = require('../models/User');
   const users = await User.find({ _id: { $in: [...ids] } })
@@ -143,9 +160,17 @@ const byEmployee = asyncHandler(async (req, res) => {
   const rows = [...ids].map((id) => {
     const c = calls.find((x) => String(x._id) === id) || {};
     const cv = convMap.get(id) || {};
+    const inv = invMap.get(id) || {};
     const u = userMap.get(id);
     return {
       employee: u ? { _id: u._id, name: u.name, email: u.email } : { _id: id },
+      // Lead inventory (all-time)
+      leadsTotal: inv.leadsTotal || 0,
+      leadsNew: inv.leadsNew || 0,
+      leadsInProgress: inv.leadsInProgress || 0,
+      leadsConverted: inv.leadsConverted || 0,
+      leadsLost: inv.leadsLost || 0,
+      // Activity (selected period)
       totalCalls: c.totalCalls || 0,
       no_pickup: c.no_pickup || 0,
       high_rate: c.high_rate || 0,
@@ -157,7 +182,12 @@ const byEmployee = asyncHandler(async (req, res) => {
     };
   });
 
-  rows.sort((a, b) => b.conversions - a.conversions || b.totalCalls - a.totalCalls);
+  rows.sort(
+    (a, b) =>
+      b.leadsTotal - a.leadsTotal ||
+      b.conversions - a.conversions ||
+      b.totalCalls - a.totalCalls
+  );
 
   res.json({ range: { from, to }, rows });
 });

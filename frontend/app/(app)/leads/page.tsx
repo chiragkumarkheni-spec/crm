@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -33,6 +33,22 @@ export default function LeadsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
+  // Admin can land here filtered to one rep (from the Reports page).
+  const [employeeId, setEmployeeId] = useState<string | null>(null);
+  const [employeeName, setEmployeeName] = useState('');
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    setEmployeeId(sp.get('employee'));
+    setEmployeeName(sp.get('name') || '');
+  }, []);
+
+  function clearRepFilter() {
+    setEmployeeId(null);
+    setEmployeeName('');
+    setPage(1);
+    window.history.replaceState({}, '', '/leads');
+  }
 
   const inBin = isAdmin && tab === 'bin';
   const PER_PAGE = 50;
@@ -55,6 +71,7 @@ export default function LeadsPage() {
   if (statusFilter) params.set('status', statusFilter);
   if (search) params.set('search', search);
   if (inBin) params.set('deleted', 'true');
+  if (isAdmin && employeeId) params.set('employee', employeeId);
   params.set('page', String(page));
   params.set('limit', String(PER_PAGE));
   const { data, refetch: load } = useApiData<LeadsResponse>(
@@ -90,6 +107,20 @@ export default function LeadsPage() {
           </Button>
         )}
       </div>
+
+      {isAdmin && employeeId && (
+        <div className="flex items-center justify-between rounded-xl bg-brand-50 px-4 py-2 text-sm">
+          <span className="text-brand-800">
+            Showing leads of <strong>{employeeName || 'selected rep'}</strong>
+          </span>
+          <button
+            onClick={clearRepFilter}
+            className="font-medium text-brand-700 hover:underline"
+          >
+            Show all leads
+          </button>
+        </div>
+      )}
 
       {/* Admin-only tabs: Leads vs Recycle Bin */}
       {isAdmin && (
