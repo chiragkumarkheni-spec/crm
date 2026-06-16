@@ -358,9 +358,21 @@ function SampleRequestCard({
   );
 }
 
+// Default "development" note for each outcome, so the rep just picks the outcome
+// and the note auto-fills (no typing needed). They can still edit it if they want.
+const DEV_DEFAULTS: Record<Outcome, string> = {
+  in_progress: 'Baat hui — interested hai, follow-up jaari.',
+  no_pickup: 'Call uthaya nahi (no pickup).',
+  high_rate: 'Rate zyada bataya — high rate.',
+  no_capacity: 'Distributorship ki capacity nahi hai.',
+  retail_enquiry: 'Sirf retail enquiry — distributor material nahi.',
+  converted: 'Distributor me convert ho gaya. 🎉',
+  lost: 'Lead drop — interested nahi.',
+};
+
 function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void }) {
   const [outcome, setOutcome] = useState<Outcome>('in_progress');
-  const [development, setDevelopment] = useState('');
+  const [development, setDevelopment] = useState(DEV_DEFAULTS.in_progress);
   const [nextFollowUpDate, setNextFollowUpDate] = useState('');
   const [nextFollowUpTime, setNextFollowUpTime] = useState('');
   const [orderValue, setOrderValue] = useState('');
@@ -396,7 +408,7 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
         nextFollowUpDate: nextISO,
         orderValue: outcome === 'converted' ? Number(orderValue) : undefined,
       });
-      setDevelopment('');
+      setDevelopment(DEV_DEFAULTS.in_progress);
       setNextFollowUpDate('');
       setNextFollowUpTime('');
       setOrderValue('');
@@ -421,7 +433,11 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
             <select
               className={inputClass}
               value={outcome}
-              onChange={(e) => setOutcome(e.target.value as Outcome)}
+              onChange={(e) => {
+                const o = e.target.value as Outcome;
+                setOutcome(o);
+                setDevelopment(DEV_DEFAULTS[o]); // auto-fill the note from the outcome
+              }}
             >
               {(Object.keys(OUTCOME_LABELS) as Outcome[]).map((o) => (
                 <option key={o} value={o}>{OUTCOME_LABELS[o]}</option>
@@ -469,14 +485,14 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
             <strong>🔴 Call now</strong> me aa jaayegi.
           </p>
         )}
-        <Field label="Development (what happened) *">
+        <Field label="Development (auto-filled from outcome — edit if you want)">
           <textarea
             className={inputClass}
             rows={3}
             required
             value={development}
             onChange={(e) => setDevelopment(e.target.value)}
-            placeholder="e.g. Spoke to owner, interested but wants better rate; will revisit next week."
+            placeholder="Outcome select karte hi yahan note aa jaayega…"
           />
         </Field>
         <div>
