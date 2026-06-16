@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import type { Lead, FollowUp, Outcome, User, DistributorCall } from '@/lib/types';
-import { OUTCOME_LABELS, DISTRIBUTOR_CATEGORIES } from '@/lib/types';
+import type { Lead, FollowUp, Outcome, User } from '@/lib/types';
+import { OUTCOME_LABELS } from '@/lib/types';
 import { Card, Button, Field, inputClass, StatusBadge } from '@/components/ui';
 import { formatDate, formatDateTime, formatMoney, todayISO } from '@/lib/format';
 
@@ -28,19 +28,15 @@ export default function LeadDetailPage() {
   const id = params.id;
   const [lead, setLead] = useState<Lead | null>(null);
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
-  const [distributorCalls, setDistributorCalls] = useState<DistributorCall[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
 
   const load = useCallback(() => {
     api
-      .get<{ lead: Lead; followUps: FollowUp[]; distributorCalls: DistributorCall[] }>(
-        `/api/leads/${id}`
-      )
+      .get<{ lead: Lead; followUps: FollowUp[] }>(`/api/leads/${id}`)
       .then((d) => {
         setLead(d.lead);
         setFollowUps(d.followUps);
-        setDistributorCalls(d.distributorCalls || []);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -173,13 +169,12 @@ export default function LeadDetailPage() {
       {!isClosed && (
         <FollowUpForm leadId={id} onSaved={() => router.push('/follow-ups')} />
       )}
-      {/* Converted = now a distributor → log servicing calls (separate from leads) */}
-      {lead.status === 'converted' && (
-        <DistributorPanel lead={lead} calls={distributorCalls} onSaved={load} />
-      )}
-      {lead.status === 'lost' && (
+      {isClosed && (
         <Card>
-          <p className="text-slate-500">This lead is closed (lost) — the inquiry has ended.</p>
+          <p className="text-slate-500">
+            This lead is {lead.status === 'converted' ? 'converted 🎉' : 'closed'} — the
+            inquiry has ended.
+          </p>
         </Card>
       )}
 
@@ -591,119 +586,6 @@ function LeadEditForm({ lead, onSaved }: { lead: Lead; onSaved: () => void }) {
           </Button>
         </div>
       </form>
-    </Card>
-  );
-}
-
-function DistributorPanel({
-  lead,
-  calls,
-  onSaved,
-}: {
-  lead: Lead;
-  calls: DistributorCall[];
-  onSaved: () => void;
-}) {
-  const [category, setCategory] = useState('new_order');
-  const [direction, setDirection] = useState<'incoming' | 'outgoing'>('incoming');
-  const [note, setNote] = useState('');
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
-    setSaving(true);
-    try {
-      await api.post(`/api/leads/${lead._id}/distributor-calls`, { category, direction, note });
-      setNote('');
-      setCategory('new_order');
-      setDirection('incoming');
-      onSaved();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to log call');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Card>
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Distributor — log a call / interaction</h2>
-        <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
-          ✅ Distributor
-        </span>
-      </div>
-      <p className="mt-1 text-xs text-slate-400">
-        Ye ab aapka distributor hai (lead nahi). Order / payment / complaint etc. yahan log karo.
-      </p>
-
-      <form onSubmit={submit} className="mt-3 flex flex-col gap-4">
-        {error && (
-          <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
-        )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Reason *">
-            <select className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)}>
-              {Object.entries(DISTRIBUTOR_CATEGORIES).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Call type">
-            <select
-              className={inputClass}
-              value={direction}
-              onChange={(e) => setDirection(e.target.value as 'incoming' | 'outgoing')}
-            >
-              <option value="incoming">Incoming (distributor ne call kiya)</option>
-              <option value="outgoing">Outgoing (humne call kiya)</option>
-            </select>
-          </Field>
-        </div>
-        <Field label="Note (optional)">
-          <textarea
-            className={inputClass}
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="e.g. 500 ltr ka naya order; payment 15 din me."
-          />
-        </Field>
-        <div>
-          <Button type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Log call'}
-          </Button>
-        </div>
-      </form>
-
-      <div className="mt-5">
-        <h3 className="mb-2 text-sm font-semibold">Interaction history ({calls.length})</h3>
-        {calls.length === 0 ? (
-          <p className="text-sm text-slate-400">Abhi koi distributor call log nahi.</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {calls.map((c) => (
-              <div key={c._id} className="rounded-lg border border-stone-200 px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">
-                    {DISTRIBUTOR_CATEGORIES[c.category] || c.category}{' '}
-                    <span className="text-xs font-normal text-slate-400">· {c.direction}</span>
-                  </span>
-                  <span className="text-xs text-slate-400">{formatDateTime(c.date)}</span>
-                </div>
-                {c.note && <p className="text-sm text-slate-700">{c.note}</p>}
-                {typeof c.employee === 'object' && (
-                  <p className="text-xs text-slate-400">by {(c.employee as User).name}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </Card>
   );
 }

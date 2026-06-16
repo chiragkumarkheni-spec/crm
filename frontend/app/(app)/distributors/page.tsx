@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useApiData } from '@/lib/useApiData';
+import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import type { Lead, User } from '@/lib/types';
+import { useApiData } from '@/lib/useApiData';
+import type { Distributor, User } from '@/lib/types';
 import { Card, Button, Field, inputClass } from '@/components/ui';
-import { formatMoney } from '@/lib/format';
+import { formatDate } from '@/lib/format';
 
-interface LeadsResponse {
-  items: Lead[];
+interface DistResponse {
+  items: Distributor[];
   total: number;
   page: number;
   pages: number;
@@ -20,30 +21,43 @@ export default function DistributorsPage() {
   const isAdmin = user?.role === 'admin';
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [showForm, setShowForm] = useState(false);
   const PER = 50;
 
   const params = new URLSearchParams();
-  params.set('status', 'converted');
   if (search) params.set('search', search);
   params.set('page', String(page));
   params.set('limit', String(PER));
-  const { data } = useApiData<LeadsResponse>(`/api/leads?${params.toString()}`);
+  const { data, refetch } = useApiData<DistResponse>(`/api/distributors?${params.toString()}`);
 
-  const repName = (l: Lead) =>
-    typeof l.assignedTo === 'object' && l.assignedTo ? (l.assignedTo as User).name : '';
+  const repName = (d: Distributor) =>
+    typeof d.assignedTo === 'object' && d.assignedTo ? (d.assignedTo as User).name : '';
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
+      <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Distributors</h1>
-        <p className="text-slate-500 text-sm">
-          Converted leads — ab ye aapke distributors hain. Kisi pe click karke order /
-          payment / complaint / rate etc. log karo.
-        </p>
+        <Button onClick={() => setShowForm((s) => !s)}>
+          {showForm ? 'Close' : '+ Add distributor'}
+        </Button>
       </div>
+      <p className="-mt-2 text-sm text-slate-500">
+        Aapke existing distributors (ye leads nahi hain). Add karo, aur jab call aaye/karein to
+        reason ke saath log karo.
+      </p>
+
+      {showForm && (
+        <AddDistributorForm
+          onCreated={() => {
+            setShowForm(false);
+            setPage(1);
+            refetch();
+          }}
+        />
+      )}
 
       <Card className="flex flex-wrap items-end gap-3">
-        <Field label="Search distributor (name / mobile / company)">
+        <Field label="Search (name / mobile / company)">
           <input
             className={inputClass}
             value={search}
@@ -67,33 +81,33 @@ export default function DistributorsPage() {
               <th className="px-4 py-3 font-medium">Company</th>
               <th className="px-4 py-3 font-medium">Mobile</th>
               {isAdmin && <th className="px-4 py-3 font-medium">Rep</th>}
-              <th className="px-4 py-3 font-medium">State</th>
-              <th className="px-4 py-3 font-medium">Order value</th>
+              <th className="px-4 py-3 font-medium">City</th>
+              <th className="px-4 py-3 font-medium">Calls</th>
+              <th className="px-4 py-3 font-medium">Last call</th>
             </tr>
           </thead>
           <tbody>
-            {data?.items.map((l) => (
-              <tr key={l._id} className="border-t border-stone-100 hover:bg-stone-50">
+            {data?.items.map((d) => (
+              <tr key={d._id} className="border-t border-stone-100 hover:bg-stone-50">
                 <td className="px-4 py-3">
-                  <Link href={`/leads/${l._id}`} className="font-medium text-slate-900 hover:underline">
-                    {l.name || 'Unnamed'}
+                  <Link href={`/distributors/${d._id}`} className="font-medium text-slate-900 hover:underline">
+                    {d.name}
                   </Link>
                 </td>
-                <td className="px-4 py-3 text-slate-600">{l.companyName || '—'}</td>
-                <td className="px-4 py-3 text-slate-600">{l.mobileNumber}</td>
-                {isAdmin && (
-                  <td className="px-4 py-3 font-medium text-slate-700">{repName(l) || '—'}</td>
-                )}
-                <td className="px-4 py-3 text-slate-600">{l.state || '—'}</td>
-                <td className="px-4 py-3 font-medium text-green-700">
-                  {formatMoney(l.order?.value || 0)}
+                <td className="px-4 py-3 text-slate-600">{d.companyName || '—'}</td>
+                <td className="px-4 py-3 text-slate-600">{d.mobileNumber}</td>
+                {isAdmin && <td className="px-4 py-3 font-medium text-slate-700">{repName(d) || '—'}</td>}
+                <td className="px-4 py-3 text-slate-600">{d.city || '—'}</td>
+                <td className="px-4 py-3 text-slate-600">{d.callCount || 0}</td>
+                <td className="px-4 py-3 text-slate-600">
+                  {d.lastCallAt ? formatDate(d.lastCallAt) : '—'}
                 </td>
               </tr>
             ))}
             {data && data.items.length === 0 && (
               <tr>
-                <td colSpan={isAdmin ? 6 : 5} className="px-4 py-8 text-center text-slate-500">
-                  Abhi koi distributor nahi. Jab lead &quot;Converted&quot; hogi, woh yahan aayegi.
+                <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-500">
+                  Abhi koi distributor nahi. &quot;+ Add distributor&quot; se add karo.
                 </td>
               </tr>
             )}
@@ -117,5 +131,82 @@ export default function DistributorsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function AddDistributorForm({ onCreated }: { onCreated: () => void }) {
+  const [form, setForm] = useState({
+    name: '',
+    mobileNumber: '',
+    companyName: '',
+    city: '',
+    state: '',
+    email: '',
+    address: '',
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  function set(k: string, v: string) {
+    setForm((f) => ({ ...f, [k]: v }));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      await api.post('/api/distributors', form);
+      onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add distributor');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <form onSubmit={submit} className="flex flex-col gap-4">
+        <h2 className="font-semibold">New distributor</h2>
+        {error && (
+          <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Name *">
+            <input className={inputClass} required value={form.name} onChange={(e) => set('name', e.target.value)} />
+          </Field>
+          <Field label="Mobile number *">
+            <input
+              className={inputClass}
+              required
+              value={form.mobileNumber}
+              onChange={(e) => set('mobileNumber', e.target.value.replace(/[^\d/ ]/g, ''))}
+              placeholder="10-digit mobile"
+            />
+          </Field>
+          <Field label="Company / firm">
+            <input className={inputClass} value={form.companyName} onChange={(e) => set('companyName', e.target.value)} />
+          </Field>
+          <Field label="City">
+            <input className={inputClass} value={form.city} onChange={(e) => set('city', e.target.value)} />
+          </Field>
+          <Field label="State">
+            <input className={inputClass} value={form.state} onChange={(e) => set('state', e.target.value)} />
+          </Field>
+          <Field label="Email">
+            <input type="email" className={inputClass} value={form.email} onChange={(e) => set('email', e.target.value)} />
+          </Field>
+          <Field label="Address">
+            <input className={inputClass} value={form.address} onChange={(e) => set('address', e.target.value)} />
+          </Field>
+        </div>
+        <div>
+          <Button type="submit" disabled={saving}>
+            {saving ? 'Saving…' : 'Add distributor'}
+          </Button>
+        </div>
+      </form>
+    </Card>
   );
 }

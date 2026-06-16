@@ -72,9 +72,25 @@ export interface Activity {
   createdAt: string;
 }
 
+export interface Distributor {
+  _id: string;
+  name: string;
+  mobileNumber: string;
+  companyName?: string;
+  email?: string;
+  city?: string;
+  state?: string;
+  address?: string;
+  notes?: string;
+  assignedTo?: User | string;
+  callCount?: number;
+  lastCallAt?: string;
+  createdAt: string;
+}
+
 export interface DistributorCall {
   _id: string;
-  lead: string;
+  distributor: string;
   employee: User | string;
   category: string;
   direction: 'incoming' | 'outgoing';

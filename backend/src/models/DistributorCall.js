@@ -1,8 +1,7 @@
 const mongoose = require('mongoose');
 
-// A call / interaction with an EXISTING distributor (a lead that already
-// converted). This is separate from the lead follow-up pipeline so distributor
-// servicing work and lead-chasing work never get mixed up.
+// A call / interaction with an existing distributor (a standalone record — these
+// distributors are NOT leads and their data does not live in the lead pipeline).
 const CATEGORIES = [
   'new_order',
   'payment',
@@ -16,7 +15,12 @@ const CATEGORIES = [
 
 const distributorCallSchema = new mongoose.Schema(
   {
-    lead: { type: mongoose.Schema.Types.ObjectId, ref: 'Lead', required: true, index: true },
+    distributor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Distributor',
+      required: true,
+      index: true,
+    },
     employee: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     category: { type: String, enum: CATEGORIES, required: true },
     direction: { type: String, enum: ['incoming', 'outgoing'], default: 'incoming' },
@@ -26,7 +30,7 @@ const distributorCallSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-distributorCallSchema.index({ lead: 1, date: -1 });
+distributorCallSchema.index({ distributor: 1, date: -1 });
 distributorCallSchema.statics.CATEGORIES = CATEGORIES;
 
 module.exports =
