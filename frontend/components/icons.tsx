@@ -89,6 +89,16 @@ export function IconRupee({ className }: IconProps) {
   );
 }
 
+export function IconDistributors({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="M3 9l1-5h16l1 5" />
+      <path d="M4 9h16v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9Z" />
+      <path d="M9 13h6" />
+    </svg>
+  );
+}
+
 export function IconActivity({ className }: IconProps) {
   return (
     <svg {...base(className)}>

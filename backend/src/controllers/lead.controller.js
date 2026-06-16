@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Lead = require('../models/Lead');
 const FollowUp = require('../models/FollowUp');
+const DistributorCall = require('../models/DistributorCall');
 const { startOfDay, endOfDay, isToday } = require('../utils/date');
 const { sendIntroMessage } = require('../services/whatsapp');
 const { logActivity } = require('../utils/activity');
@@ -166,12 +167,16 @@ const todayFollowUps = asyncHandler(async (req, res) => {
 const getLead = asyncHandler(async (req, res) => {
   // Fetch the lead and its follow-up history in parallel (the history is keyed
   // by the lead id from the URL, so it doesn't need to wait for the lead query).
-  const [lead, followUps] = await Promise.all([
+  const [lead, followUps, distributorCalls] = await Promise.all([
     Lead.findById(req.params.id)
       .populate('assignedTo', 'name email')
       .populate('createdBy', 'name email')
       .lean(),
     FollowUp.find({ lead: req.params.id })
+      .populate('employee', 'name')
+      .sort({ date: -1, createdAt: -1 })
+      .lean(),
+    DistributorCall.find({ lead: req.params.id })
       .populate('employee', 'name')
       .sort({ date: -1, createdAt: -1 })
       .lean(),
@@ -184,7 +189,7 @@ const getLead = asyncHandler(async (req, res) => {
     res.status(403);
     throw new Error('Not your lead');
   }
-  res.json({ lead, followUps });
+  res.json({ lead, followUps, distributorCalls });
 });
 
 // ---------------------------------------------------------------------------
@@ -456,6 +461,47 @@ const restoreLead = asyncHandler(async (req, res) => {
   res.json({ success: true, _id: lead._id });
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/leads/:id/distributor-calls — log a call/interaction with an
+// EXISTING distributor (a converted lead). Kept separate from lead follow-ups
+// so distributor servicing and lead-chasing never get mixed up.
+// ---------------------------------------------------------------------------
+const addDistributorCall = asyncHandler(async (req, res) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) {
+    res.status(404);
+    throw new Error('Lead not found');
+  }
+  if (!isAdmin(req.user) && lead.assignedTo.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error('Not your distributor');
+  }
+  if (lead.status !== 'converted') {
+    res.status(400);
+    throw new Error('This is not a distributor yet (the lead is not converted).');
+  }
+  const { category, note, direction } = req.body;
+  if (!category) {
+    res.status(400);
+    throw new Error('Please choose a category for the call.');
+  }
+  const call = await DistributorCall.create({
+    lead: lead._id,
+    employee: req.user._id,
+    category,
+    direction: direction === 'outgoing' ? 'outgoing' : 'incoming',
+    note: note ? String(note).trim() : '',
+    date: new Date(),
+  });
+  await logActivity({
+    user: req.user,
+    action: 'distributor_call',
+    lead,
+    detail: `${category.replace(/_/g, ' ')}${note ? ' · ' + note : ''}`,
+  });
+  res.status(201).json(call);
+});
+
 module.exports = {
   createLead,
   listLeads,
@@ -468,4 +514,5 @@ module.exports = {
   addFollowUp,
   deleteLead,
   restoreLead,
+  addDistributorCall,
 };

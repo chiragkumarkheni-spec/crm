@@ -72,6 +72,28 @@ export interface Activity {
   createdAt: string;
 }
 
+export interface DistributorCall {
+  _id: string;
+  lead: string;
+  employee: User | string;
+  category: string;
+  direction: 'incoming' | 'outgoing';
+  note?: string;
+  date: string;
+  createdAt: string;
+}
+
+export const DISTRIBUTOR_CATEGORIES: Record<string, string> = {
+  new_order: 'New order',
+  payment: 'Payment',
+  marketing: 'Marketing service',
+  complaint: 'Complaint',
+  rate: 'Rate discussion',
+  product_info: 'Product info',
+  general: 'General talk',
+  other: 'Other',
+};
+
 export interface FollowUp {
   _id: string;
   lead: string;
