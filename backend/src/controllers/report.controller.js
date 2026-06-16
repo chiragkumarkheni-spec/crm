@@ -145,17 +145,26 @@ const byEmployee = asyncHandler(async (req, res) => {
   const convMap = new Map(conv.map((c) => [String(c._id), c]));
   const invMap = new Map(leadInv.map((c) => [String(c._id), c]));
 
-  // Merge, attach user names. A rep appears if they have leads OR activity.
-  const ids = new Set([
-    ...calls.map((c) => String(c._id)),
-    ...conv.map((c) => String(c._id)),
-    ...leadInv.map((c) => String(c._id)),
-  ]);
+  // The report is rep-wise: show every active EMPLOYEE (even with zero leads),
+  // plus any lead owner. Admins are not reps, so they don't get a row.
   const User = require('../models/User');
-  const users = await User.find({ _id: { $in: [...ids] } })
+  const employees = await User.find({
+    deleted: { $ne: true },
+    active: true,
+    role: 'employee',
+  })
     .select('name email')
     .lean();
-  const userMap = new Map(users.map((u) => [String(u._id), u]));
+  const ids = new Set([
+    ...leadInv.map((c) => String(c._id)),
+    ...employees.map((u) => String(u._id)),
+  ]);
+  const userMap = new Map(employees.map((u) => [String(u._id), u]));
+  const missing = [...ids].filter((id) => !userMap.has(id));
+  if (missing.length) {
+    const more = await User.find({ _id: { $in: missing } }).select('name email').lean();
+    more.forEach((u) => userMap.set(String(u._id), u));
+  }
 
   const rows = [...ids].map((id) => {
     const c = calls.find((x) => String(x._id) === id) || {};
