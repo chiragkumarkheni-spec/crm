@@ -18,6 +18,7 @@ const User = require('../src/models/User');
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry'); // preview only, writes nothing to the database
 const SET_CATALOGUE = args.includes('--catalogue'); // mark catalogue sent on every imported lead
+const FORCE_TODAY = args.includes('--today'); // ignore the file's Lead Date, use today's date
 const file = args.find((a) => !a.startsWith('--'));
 if (!file) {
   console.error('Usage: node scripts/import-leads.js <path-to-xlsx> [--dry]');
@@ -116,7 +117,9 @@ function parseDate(raw) {
       owner = admin; // fallback so the lead is never lost; admin can reassign later
     }
 
-    const leadDate = parseDate(val(r, 'Lead Date (optional, DD-MM-YYYY)', 'Lead Date')) || new Date();
+    const leadDate = FORCE_TODAY
+      ? new Date()
+      : parseDate(val(r, 'Lead Date (optional, DD-MM-YYYY)', 'Lead Date')) || new Date();
 
     if (!DRY) {
       await Lead.create({
