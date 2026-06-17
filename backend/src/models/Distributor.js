@@ -17,6 +17,11 @@ const distributorSchema = new mongoose.Schema(
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
+    // If this distributor was auto-created from a converted lead, link back to
+    // that lead (so we never create a duplicate distributor for the same lead).
+    lead: { type: mongoose.Schema.Types.ObjectId, ref: 'Lead', index: true },
+    fromLead: { type: Boolean, default: false },
+
     callCount: { type: Number, default: 0 },
     lastCallAt: { type: Date },
     // Running total of all order amounts placed by this distributor.

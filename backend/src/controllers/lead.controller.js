@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Lead = require('../models/Lead');
 const FollowUp = require('../models/FollowUp');
+const Distributor = require('../models/Distributor');
 const { startOfDay, endOfDay, isToday } = require('../utils/date');
 const { sendIntroMessage } = require('../services/whatsapp');
 const { logActivity } = require('../utils/activity');
@@ -482,7 +483,38 @@ const addFollowUp = asyncHandler(async (req, res) => {
     })}`;
   await logActivity({ user: req.user, action: 'followup', lead, detail });
 
-  res.status(201).json({ lead, followUp });
+  // THUMB RULE: a converted lead automatically becomes a distributor and is added
+  // to the Distributors list. We never create a duplicate for the same lead.
+  let distributor = null;
+  if (outcome === 'converted') {
+    distributor = await Distributor.findOne({ lead: lead._id });
+    if (!distributor) {
+      distributor = await Distributor.create({
+        name: lead.name,
+        mobileNumber: lead.mobileNumber,
+        companyName: lead.companyName,
+        email: lead.email,
+        city: lead.city,
+        state: lead.state,
+        address: lead.address,
+        notes: lead.notes,
+        assignedTo: lead.assignedTo,
+        createdBy: req.user._id,
+        lead: lead._id,
+        fromLead: true,
+        // The conversion order is this new distributor's first order.
+        totalOrderValue: Number(orderValue) || 0,
+      });
+      await logActivity({
+        user: req.user,
+        action: 'distributor_added',
+        lead,
+        detail: 'auto-created from converted lead',
+      });
+    }
+  }
+
+  res.status(201).json({ lead, followUp, distributor });
 });
 
 // ---------------------------------------------------------------------------

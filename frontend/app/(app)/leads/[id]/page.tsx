@@ -459,6 +459,7 @@ const DEV_DEFAULTS: Record<Outcome, string> = {
 };
 
 function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void }) {
+  const router = useRouter();
   const [outcome, setOutcome] = useState<Outcome>('in_progress');
   const [development, setDevelopment] = useState(DEV_DEFAULTS.in_progress);
   const [nextFollowUpDate, setNextFollowUpDate] = useState('');
@@ -466,6 +467,11 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
   const [orderValue, setOrderValue] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  // When a lead converts → distributor, we show a celebration popup before
+  // leaving the page (instead of silently navigating away).
+  const [converted, setConverted] = useState<{ distributorId?: string; name: string } | null>(
+    null
+  );
 
   const isSameDay = !!nextFollowUpDate && nextFollowUpDate === todayISO();
 
@@ -490,18 +496,30 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
 
     setSaving(true);
     try {
-      await api.post(`/api/leads/${leadId}/followups`, {
-        outcome,
-        development,
-        nextFollowUpDate: nextISO,
-        orderValue: outcome === 'converted' ? Number(orderValue) : undefined,
-      });
+      const res = await api.post<{ distributor?: { _id: string; name: string } | null }>(
+        `/api/leads/${leadId}/followups`,
+        {
+          outcome,
+          development,
+          nextFollowUpDate: nextISO,
+          orderValue: outcome === 'converted' ? Number(orderValue) : undefined,
+        }
+      );
+      const wasConverted = outcome === 'converted';
       setDevelopment(DEV_DEFAULTS.in_progress);
       setNextFollowUpDate('');
       setNextFollowUpTime('');
       setOrderValue('');
       setOutcome('in_progress');
-      onSaved();
+      if (wasConverted) {
+        // Celebrate — and let the rep choose to view the new distributor.
+        setConverted({
+          distributorId: res.distributor?._id,
+          name: res.distributor?.name || 'Lead',
+        });
+      } else {
+        onSaved();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save follow-up');
     } finally {
@@ -510,9 +528,47 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
   }
 
   return (
-    <Card>
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        <h2 className="font-semibold">Record a follow-up / call</h2>
+    <>
+      {converted && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
+            {/* Red congratulations line */}
+            <div className="bg-rose-600 px-5 py-3 text-center text-base font-bold text-white">
+              🎉 CONGRATULATIONS! 🎉
+            </div>
+            <div className="flex flex-col items-center gap-3 px-6 py-6 text-center">
+              <span className="text-5xl">🤝</span>
+              <p className="text-lg font-semibold text-slate-900">
+                Lead convert ho gayi — ab <span className="text-rose-600">DISTRIBUTOR</span> ban gayi!
+              </p>
+              <p className="text-sm text-slate-600">
+                <strong>{converted.name}</strong> ab aapke Distributors list me add ho gaya hai. 👏
+              </p>
+              <div className="mt-2 flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
+                {converted.distributorId && (
+                  <Button
+                    onClick={() => router.push(`/distributors/${converted.distributorId}`)}
+                  >
+                    Distributor dekho →
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setConverted(null);
+                    onSaved();
+                  }}
+                >
+                  Theek hai
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <Card>
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <h2 className="font-semibold">Record a follow-up / call</h2>
         {error && (
           <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
         )}
@@ -583,13 +639,14 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
             placeholder="Outcome select karte hi yahan note aa jaayega…"
           />
         </Field>
-        <div>
-          <Button type="submit" disabled={saving}>
-            {saving ? 'Saving…' : 'Save follow-up'}
-          </Button>
-        </div>
-      </form>
-    </Card>
+          <div>
+            <Button type="submit" disabled={saving}>
+              {saving ? 'Saving…' : 'Save follow-up'}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </>
   );
 }
 
