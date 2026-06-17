@@ -140,7 +140,7 @@ function LogCallForm({ distributorId, onSaved }: { distributorId: string; onSave
         category,
         direction,
         note,
-        orderValue: orderValue ? Number(orderValue) : 0,
+        orderValue: category === 'new_order' && orderValue ? Number(orderValue) : 0,
         nextFollowUpDate: nextISO,
       });
       setNote('');
@@ -166,7 +166,16 @@ function LogCallForm({ distributorId, onSaved }: { distributorId: string; onSave
         )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Reason *">
-            <select className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)}>
+            <select
+              className={inputClass}
+              value={category}
+              onChange={(e) => {
+                const c = e.target.value;
+                setCategory(c);
+                // Order value only makes sense for a "New order" — clear it otherwise.
+                if (c !== 'new_order') setOrderValue('');
+              }}
+            >
               {Object.entries(DISTRIBUTOR_CATEGORIES).map(([k, v]) => (
                 <option key={k} value={k}>
                   {v}
@@ -184,16 +193,19 @@ function LogCallForm({ distributorId, onSaved }: { distributorId: string; onSave
               <option value="outgoing">Outgoing (humne call kiya)</option>
             </select>
           </Field>
-          <Field label="Order value (₹) — agar order diya">
-            <input
-              type="number"
-              min="0"
-              className={inputClass}
-              value={orderValue}
-              onChange={(e) => setOrderValue(e.target.value)}
-              placeholder="0"
-            />
-          </Field>
+          {/* Order value shows ONLY when the reason is "New order". */}
+          {category === 'new_order' && (
+            <Field label="Order value (₹) — agar order diya">
+              <input
+                type="number"
+                min="0"
+                className={inputClass}
+                value={orderValue}
+                onChange={(e) => setOrderValue(e.target.value)}
+                placeholder="0"
+              />
+            </Field>
+          )}
         </div>
         <Field label="Note (optional)">
           <textarea
