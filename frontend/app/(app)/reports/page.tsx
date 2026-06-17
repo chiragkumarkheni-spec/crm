@@ -11,6 +11,7 @@ import { formatMoney, todayISO } from '@/lib/format';
 
 export default function ReportsPage() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [from, setFrom] = useState('');
   const [to, setTo] = useState(todayISO());
   const [summary, setSummary] = useState<ReportSummary | null>(null);
@@ -53,8 +54,25 @@ export default function ReportsPage() {
         <StatCard label="New leads" value={summary?.newLeads ?? '—'} />
         <StatCard label="Total calls" value={summary?.totalCalls ?? '—'} />
         <StatCard label="Catalogue sent" value={summary?.cataloguesSent ?? '—'} hint="all-time" />
-        <StatCard label="Converted" value={summary?.conversions ?? '—'} hint="distributors" />
-        <StatCard label="Order value" value={summary ? formatMoney(summary.orderValue) : '—'} />
+        {isAdmin ? (
+          <>
+            <StatCard label="Converted" value={summary?.conversions ?? '—'} hint="distributors" />
+            <StatCard label="Order value" value={summary ? formatMoney(summary.orderValue) : '—'} />
+          </>
+        ) : (
+          <>
+            <StatCard
+              label="Converted (as distributor)"
+              value={summary?.monthlyConversions ?? '—'}
+              hint="📅 this month (monthly)"
+            />
+            <StatCard
+              label="Order value"
+              value={summary ? formatMoney(summary.monthlyOrderValue) : '—'}
+              hint="📅 this month (monthly)"
+            />
+          </>
+        )}
         <Link href="/distributor-calls" className="block">
           <StatCard
             label="Distributor calls"

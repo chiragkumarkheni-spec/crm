@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const Lead = require('../models/Lead');
 const FollowUp = require('../models/FollowUp');
 const DistributorCall = require('../models/DistributorCall');
-const { startOfDay, endOfDay } = require('../utils/date');
+const { startOfDay, endOfDay, startOfMonth, endOfMonth } = require('../utils/date');
 
 const isAdmin = (user) => user.role === 'admin';
 
@@ -56,8 +56,17 @@ const summary = asyncHandler(async (req, res) => {
   else if (req.query.employee)
     distMatch.employee = new mongoose.Types.ObjectId(req.query.employee);
 
+  // Converted-as-distributor + order value for the CURRENT MONTH — always shown
+  // monthly (regardless of the daily/range filter) on the rep's report screen.
+  const monthStart = startOfMonth();
+  const monthEnd = endOfMonth();
+  const monthLeadMatch = { convertedAt: { $gte: monthStart, $lte: monthEnd } };
+  if (!isAdmin(req.user)) monthLeadMatch.assignedTo = req.user._id;
+  else if (req.query.employee)
+    monthLeadMatch.assignedTo = new mongoose.Types.ObjectId(req.query.employee);
+
   // These run independently — in parallel instead of one-by-one.
-  const [outcomeAgg, convAgg, newLeads, cataloguesSent, distAgg] = await Promise.all([
+  const [outcomeAgg, convAgg, newLeads, cataloguesSent, distAgg, monthConvAgg] = await Promise.all([
     FollowUp.aggregate([
       { $match: followMatch },
       { $group: { _id: '$outcome', count: { $sum: 1 } } },
@@ -78,9 +87,21 @@ const summary = asyncHandler(async (req, res) => {
       { $match: distMatch },
       { $group: { _id: null, count: { $sum: 1 }, orderValue: { $sum: '$orderValue' } } },
     ]),
+    Lead.aggregate([
+      { $match: monthLeadMatch },
+      {
+        $group: {
+          _id: null,
+          conversions: { $sum: 1 },
+          orderValue: { $sum: '$order.value' },
+        },
+      },
+    ]),
   ]);
   const distributorCalls = distAgg[0]?.count || 0;
   const distributorOrderValue = distAgg[0]?.orderValue || 0;
+  const monthlyConversions = monthConvAgg[0]?.conversions || 0;
+  const monthlyOrderValue = monthConvAgg[0]?.orderValue || 0;
 
   const outcomes = {
     in_progress: 0,
@@ -110,6 +131,8 @@ const summary = asyncHandler(async (req, res) => {
     cataloguesSent,
     distributorCalls,
     distributorOrderValue,
+    monthlyConversions,
+    monthlyOrderValue,
   });
 });
 

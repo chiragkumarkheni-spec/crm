@@ -15,6 +15,22 @@ function endOfDay(d = new Date()) {
   return x;
 }
 
+// First instant of the current month (server local day).
+function startOfMonth(d = new Date()) {
+  const x = new Date(d);
+  x.setDate(1);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+// Last instant of the current month (server local day).
+function endOfMonth(d = new Date()) {
+  const x = new Date(d);
+  x.setMonth(x.getMonth() + 1, 0); // day 0 of next month = last day of this month
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
 function isSameDay(a, b) {
   const x = new Date(a);
   const y = new Date(b);
@@ -35,4 +51,12 @@ function isBeforeToday(d) {
   return new Date(d) < startOfDay();
 }
 
-module.exports = { startOfDay, endOfDay, isSameDay, isToday, isBeforeToday };
+module.exports = {
+  startOfDay,
+  endOfDay,
+  startOfMonth,
+  endOfMonth,
+  isSameDay,
+  isToday,
+  isBeforeToday,
+};

@@ -141,6 +141,8 @@ export interface ReportSummary {
   cataloguesSent: number;
   distributorCalls: number;
   distributorOrderValue: number;
+  monthlyConversions: number;
+  monthlyOrderValue: number;
 }
 
 export interface DistributorCallDetail {
