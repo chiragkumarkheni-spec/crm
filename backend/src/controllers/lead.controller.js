@@ -19,6 +19,14 @@ function hoursSince(date) {
   return (Date.now() - new Date(date).getTime()) / 3600000;
 }
 
+// A short correction window (in hours) for "oops" fixes a rep makes on a call —
+// undoing a mistaken catalogue/sample tick, or changing the recorded response.
+const CORRECTION_HOURS = 24;
+function within24h(date) {
+  if (!date) return false;
+  return (Date.now() - new Date(date).getTime()) / 3600000 <= CORRECTION_HOURS;
+}
+
 // Can this user still edit this lead?
 function canEditLead(user, lead) {
   const hrs = hoursSince(lead.createdAt || lead.leadDate);
@@ -293,9 +301,9 @@ const unmarkCatalogueSent = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Catalogue is not marked as sent');
   }
-  if (!isAdmin(req.user) && lead.catalogue.date && !isToday(lead.catalogue.date)) {
+  if (!isAdmin(req.user) && lead.catalogue.date && !within24h(lead.catalogue.date)) {
     res.status(403);
-    throw new Error('Catalogue can only be un-marked on the same day it was marked');
+    throw new Error('Catalogue can only be un-marked within 24 hours of marking it');
   }
   lead.catalogue = { sent: false };
   await lead.save();
@@ -324,9 +332,9 @@ const unmarkSampleSent = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('No sample is marked as sent');
   }
-  if (!isAdmin(req.user) && lead.sample.date && !isToday(lead.sample.date)) {
+  if (!isAdmin(req.user) && lead.sample.date && !within24h(lead.sample.date)) {
     res.status(403);
-    throw new Error('Sample can only be un-marked on the same day it was marked');
+    throw new Error('Sample can only be un-marked within 24 hours of marking it');
   }
   lead.sample = { sent: false };
   await lead.save();
@@ -518,6 +526,78 @@ const addFollowUp = asyncHandler(async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// PATCH /api/leads/:id/followups/:fid — correct a recorded response within 24h.
+//   A rep can change a mistaken outcome (e.g. In progress → No pickup / Rate too
+//   high) and its note for 24 hours; admins anytime. Conversion is intentionally
+//   out of scope here (it has order + distributor side-effects).
+// ---------------------------------------------------------------------------
+const EDITABLE_OUTCOMES = [
+  'in_progress',
+  'no_pickup',
+  'high_rate',
+  'no_capacity',
+  'retail_enquiry',
+  'lost',
+];
+
+const editFollowUp = asyncHandler(async (req, res) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) {
+    res.status(404);
+    throw new Error('Lead not found');
+  }
+  const followUp = await FollowUp.findOne({ _id: req.params.fid, lead: lead._id });
+  if (!followUp) {
+    res.status(404);
+    throw new Error('Follow-up not found');
+  }
+  const owns =
+    followUp.employee.toString() === req.user._id.toString() ||
+    lead.assignedTo.toString() === req.user._id.toString();
+  if (!isAdmin(req.user) && !owns) {
+    res.status(403);
+    throw new Error('Not your follow-up');
+  }
+  if (!isAdmin(req.user) && !within24h(followUp.createdAt)) {
+    res.status(403);
+    throw new Error('This response can only be edited within 24 hours of recording it');
+  }
+  // Conversion (in or out) is handled from the follow-up form, not this quick edit.
+  if (followUp.outcome === 'converted') {
+    res.status(400);
+    throw new Error('A converted follow-up cannot be changed here');
+  }
+  const { outcome, development } = req.body;
+  if (outcome !== undefined && !EDITABLE_OUTCOMES.includes(outcome)) {
+    res.status(400);
+    throw new Error('Pick a valid response (to convert, use the follow-up form)');
+  }
+  if (outcome) followUp.outcome = outcome;
+  if (development !== undefined && development.trim()) {
+    followUp.development = development.trim();
+  }
+  await followUp.save();
+
+  // The lead's pipeline status mirrors its MOST RECENT follow-up — recompute it
+  // so editing the latest response also updates the lead (older edits won't).
+  const latest = await FollowUp.findOne({ lead: lead._id })
+    .sort({ date: -1, createdAt: -1 })
+    .lean();
+  if (latest) {
+    lead.status = latest.outcome;
+    await lead.save();
+  }
+
+  await logActivity({
+    user: req.user,
+    action: 'followup_edited',
+    lead,
+    detail: `response → ${followUp.outcome.replace(/_/g, ' ')}`,
+  });
+  res.json({ lead, followUp });
+});
+
+// ---------------------------------------------------------------------------
 // DELETE /api/leads/:id — admin-only soft delete → Lead Recycle Bin.
 // The lead is hidden everywhere but kept in the database; it can be restored
 // later but never permanently removed.
@@ -590,6 +670,7 @@ module.exports = {
   markSampleSent,
   unmarkCatalogueSent,
   unmarkSampleSent,
+  editFollowUp,
   recordSampleRequest,
   addFollowUp,
   deleteLead,

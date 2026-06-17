@@ -9,6 +9,12 @@ import { OUTCOME_LABELS } from '@/lib/types';
 import { Card, Button, Field, inputClass, StatusBadge } from '@/components/ui';
 import { formatDate, formatDateTime, formatMoney, todayISO } from '@/lib/format';
 
+// True if the given timestamp is within the last 24 hours (a rep's correction window).
+function within24h(dateStr?: string): boolean {
+  if (!dateStr) return false;
+  return (Date.now() - new Date(dateStr).getTime()) / 3600000 <= 24;
+}
+
 // True if the given date string falls on the user's current calendar day.
 function isSameDay(dateStr?: string): boolean {
   if (!dateStr) return false;
@@ -30,6 +36,8 @@ export default function LeadDetailPage() {
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  // The follow-up whose response is being corrected (opens a popup).
+  const [editingFu, setEditingFu] = useState<FollowUp | null>(null);
 
   const load = useCallback(() => {
     api
@@ -220,31 +228,144 @@ export default function LeadDetailPage() {
           <p className="text-slate-500 text-sm">No follow-ups recorded yet.</p>
         ) : (
           <div className="flex flex-col gap-3">
-            {followUps.map((f) => (
-              <Card key={f._id} className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{OUTCOME_LABELS[f.outcome]}</span>
-                  <span className="text-xs text-slate-400">
-                    {formatDateTime(f.date)}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-700">{f.development}</p>
-                <div className="flex flex-wrap gap-3 text-xs text-slate-500 mt-1">
-                  {f.nextFollowUpDate && (
-                    <span>Next: {formatDate(f.nextFollowUpDate)}</span>
-                  )}
-                  {f.orderValue ? <span>Order: {formatMoney(f.orderValue)}</span> : null}
-                  {f.catalogueSent && <span>📄 catalogue sent</span>}
-                  {f.sampleSent && <span>📦 sample sent</span>}
-                  {f.whatsAppSent && <span>💬 WhatsApp sent</span>}
-                  {typeof f.employee === 'object' && (
-                    <span>by {(f.employee as User).name}</span>
-                  )}
-                </div>
-              </Card>
-            ))}
+            {followUps.map((f) => {
+              const canEditFu =
+                f.outcome !== 'converted' &&
+                (user?.role === 'admin' || within24h(f.createdAt));
+              return (
+                <Card key={f._id} className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{OUTCOME_LABELS[f.outcome]}</span>
+                    <div className="flex items-center gap-3">
+                      {canEditFu && (
+                        <button
+                          type="button"
+                          onClick={() => setEditingFu(f)}
+                          className="text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          ✏️ Edit response
+                        </button>
+                      )}
+                      <span className="text-xs text-slate-400">{formatDateTime(f.date)}</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-700">{f.development}</p>
+                  <div className="flex flex-wrap gap-3 text-xs text-slate-500 mt-1">
+                    {f.nextFollowUpDate && (
+                      <span>Next: {formatDate(f.nextFollowUpDate)}</span>
+                    )}
+                    {f.orderValue ? <span>Order: {formatMoney(f.orderValue)}</span> : null}
+                    {f.catalogueSent && <span>📄 catalogue sent</span>}
+                    {f.sampleSent && <span>📦 sample sent</span>}
+                    {f.whatsAppSent && <span>💬 WhatsApp sent</span>}
+                    {typeof f.employee === 'object' && (
+                      <span>by {(f.employee as User).name}</span>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
+      </div>
+
+      {editingFu && (
+        <EditFollowUpModal
+          leadId={id}
+          followUp={editingFu}
+          onClose={() => setEditingFu(null)}
+          onSaved={() => {
+            setEditingFu(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditFollowUpModal({
+  leadId,
+  followUp,
+  onClose,
+  onSaved,
+}: {
+  leadId: string;
+  followUp: FollowUp;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [outcome, setOutcome] = useState<Outcome>(followUp.outcome);
+  const [development, setDevelopment] = useState(followUp.development);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // Conversion is done from the follow-up form, not this quick correction.
+  const EDIT_OUTCOMES = (Object.keys(OUTCOME_LABELS) as Outcome[]).filter(
+    (o) => o !== 'converted'
+  );
+
+  async function save() {
+    setError('');
+    if (!development.trim()) {
+      setError('Note khali nahi ho sakta.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.patch(`/api/leads/${leadId}/followups/${followUp._id}`, {
+        outcome,
+        development,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+        <h2 className="mb-1 text-lg font-semibold">Edit response</h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Galti se galat response daal diya? 24 ghante ke andar yahan badal sakte ho.
+        </p>
+        {error && (
+          <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
+        )}
+        <div className="flex flex-col gap-4">
+          <Field label="Response (outcome)">
+            <select
+              className={inputClass}
+              value={outcome}
+              onChange={(e) => setOutcome(e.target.value as Outcome)}
+            >
+              {EDIT_OUTCOMES.map((o) => (
+                <option key={o} value={o}>
+                  {OUTCOME_LABELS[o]}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Development / note">
+            <textarea
+              className={inputClass}
+              rows={3}
+              value={development}
+              onChange={(e) => setDevelopment(e.target.value)}
+            />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

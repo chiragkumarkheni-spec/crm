@@ -8,6 +8,7 @@ import { Card } from '@/components/ui';
 const META: Record<string, { icon: string; verb: string; color: string }> = {
   lead_created: { icon: '🆕', verb: 'added lead', color: 'text-green-700' },
   followup: { icon: '📞', verb: 'followed up', color: 'text-blue-700' },
+  followup_edited: { icon: '✏️', verb: 'edited response for', color: 'text-amber-700' },
   lead_edited: { icon: '✏️', verb: 'edited lead', color: 'text-slate-700' },
   lead_deleted: { icon: '🗑️', verb: 'deleted lead', color: 'text-rose-700' },
   lead_restored: { icon: '↩️', verb: 'restored lead', color: 'text-amber-700' },

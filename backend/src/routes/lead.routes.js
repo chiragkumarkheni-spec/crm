@@ -9,6 +9,7 @@ const {
   markSampleSent,
   unmarkCatalogueSent,
   unmarkSampleSent,
+  editFollowUp,
   recordSampleRequest,
   addFollowUp,
   deleteLead,
@@ -31,6 +32,7 @@ router.post('/:id/sample', markSampleSent);
 router.delete('/:id/sample', unmarkSampleSent);
 router.post('/:id/sample-request', recordSampleRequest);
 router.post('/:id/followups', addFollowUp);
+router.patch('/:id/followups/:fid', editFollowUp);
 router.post('/:id/strong', setStrong);
 // Lead delete/restore are ADMIN ONLY (reps can never delete a lead).
 router.delete('/:id', adminOnly, deleteLead);
