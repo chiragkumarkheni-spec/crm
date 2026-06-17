@@ -58,17 +58,25 @@ export default function DashboardPage() {
           tone="brand"
         />
         <StatCard
-          label="Converted"
-          value={summary?.conversions ?? '—'}
-          hint="to distributor"
+          label="Converted (as distributor)"
+          value={summary?.monthlyConversions ?? '—'}
+          hint="📅 this month"
           icon={<IconCheck className="h-5 w-5" />}
           tone="green"
         />
         <StatCard
           label="Order value"
-          value={summary ? formatMoney(summary.orderValue) : '—'}
+          value={summary ? formatMoney(summary.monthlyOrderValue) : '—'}
+          hint="📅 this month"
           icon={<IconRupee className="h-5 w-5" />}
           tone="slate"
+        />
+        <StatCard
+          label="Distributor orders"
+          value={summary ? formatMoney(summary.monthlyDistributorOrderValue) : '—'}
+          hint="📅 this month"
+          icon={<IconRupee className="h-5 w-5" />}
+          tone="green"
         />
       </div>
 
