@@ -13,6 +13,15 @@ function fmtTime(d: string) {
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString([], { day: '2-digit', month: 'short' });
 }
+// How many FULL days a scheduled follow-up is late (0 = due today, not late).
+function daysLate(iso?: string): number {
+  if (!iso) return 0;
+  const sched = new Date(iso);
+  sched.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.floor((today.getTime() - sched.getTime()) / 86400000);
+}
 function fmtLongDate(iso: string) {
   return new Date(`${iso}T00:00:00`).toLocaleDateString([], {
     weekday: 'short',
@@ -65,7 +74,6 @@ export default function FollowUpsPage() {
         new Date(b.nextFollowUpDate as string).getTime()
     );
 
-  const todayStart = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
   const nothingAtAll = dueNow.length === 0 && later.length === 0 && newCount === 0;
 
   return (
@@ -164,12 +172,16 @@ export default function FollowUpsPage() {
               </Card>
             ) : (
               dueNow.map((lead) => {
-                const overdue =
-                  lead.nextFollowUpDate &&
-                  new Date(lead.nextFollowUpDate).getTime() < todayStart;
+                const late = daysLate(lead.nextFollowUpDate);
                 return (
                   <Link key={lead._id} href={`/leads/${lead._id}`}>
-                    <Card className="border-l-4 border-l-rose-500 bg-rose-50/50 transition-colors hover:bg-rose-50">
+                    <Card
+                      className={`border-l-4 transition-colors ${
+                        late > 0
+                          ? 'border-l-amber-500 bg-amber-50/60 hover:bg-amber-50'
+                          : 'border-l-rose-500 bg-rose-50/50 hover:bg-rose-50'
+                      }`}
+                    >
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <p className="font-medium">
@@ -179,9 +191,9 @@ export default function FollowUpsPage() {
                           </p>
                           <p className="text-sm text-slate-500">
                             {lead.state || '—'} · {lead.followUpCount} follow-ups ·{' '}
-                            {overdue ? (
-                              <span className="font-medium text-rose-600">
-                                overdue (was {fmtDate(lead.nextFollowUpDate as string)})
+                            {late > 0 ? (
+                              <span className="font-semibold text-amber-700">
+                                {late} din late (was {fmtDate(lead.nextFollowUpDate as string)})
                               </span>
                             ) : (
                               <span className="font-medium text-rose-600">
@@ -191,9 +203,15 @@ export default function FollowUpsPage() {
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
-                          <span className="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs font-bold text-white">
-                            CALL NOW
-                          </span>
+                          {late > 0 ? (
+                            <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-bold text-white">
+                              ⏰ LATE FOLLOWUP · {late} din
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                              CALL NOW
+                            </span>
+                          )}
                           <StatusBadge status={lead.status} />
                         </div>
                       </div>
