@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useApiData } from '@/lib/useApiData';
 import type { Lead } from '@/lib/types';
-import { Card, StatusBadge } from '@/components/ui';
+import { Card, StatusBadge, inputClass } from '@/components/ui';
+import { todayISO } from '@/lib/format';
 
 function fmtTime(d: string) {
   return new Date(d).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -12,12 +13,28 @@ function fmtTime(d: string) {
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString([], { day: '2-digit', month: 'short' });
 }
+function fmtLongDate(iso: string) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString([], {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
 
 export default function FollowUpsPage() {
-  // Scheduled callbacks (time-based reminders).
-  const { data, loading, refetch } = useApiData<Lead[]>('/api/leads/today-followups');
-  // New leads still to be called (the working backlog) — shown as a list, but
-  // NOT counted in the urgent "Call now" banner.
+  // Which day's follow-ups to view. Default = today. Pick a future date to
+  // preview which leads are scheduled for follow-up on that day.
+  const [viewDate, setViewDate] = useState(todayISO());
+  const isToday = viewDate === todayISO();
+
+  // Scheduled callbacks (time-based reminders) for the chosen day.
+  const { data, loading, refetch } = useApiData<Lead[]>(
+    isToday
+      ? '/api/leads/today-followups'
+      : `/api/leads/today-followups?date=${viewDate}`
+  );
+  // New leads still to be called (the working backlog) — only relevant for today.
   const { data: newData } = useApiData<{ items: Lead[]; total: number }>(
     '/api/leads?status=new&limit=50'
   );
@@ -53,15 +70,84 @@ export default function FollowUpsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold">Today&apos;s follow-ups</h1>
-        <p className="text-slate-500 text-sm">
-          Scheduled callbacks turn <span className="font-medium text-rose-600">🔴 Call now</span> at
-          their time. New leads to call are listed below.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">
+            {isToday ? "Today's follow-ups" : 'Follow-ups preview'}
+          </h1>
+          <p className="text-slate-500 text-sm">
+            {isToday ? (
+              <>
+                Scheduled callbacks turn{' '}
+                <span className="font-medium text-rose-600">🔴 Call now</span> at their time. New
+                leads to call are listed below.
+              </>
+            ) : (
+              <>
+                <strong>{fmtLongDate(viewDate)}</strong> ko jin leads ka follow-up scheduled hai.
+              </>
+            )}
+          </p>
+        </div>
+        {/* Date picker — aaj ke alawa kisi bhi din ke follow-up dekho */}
+        <div className="flex items-end gap-2">
+          <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
+            Date dekho
+            <input
+              type="date"
+              className={inputClass}
+              value={viewDate}
+              onChange={(e) => setViewDate(e.target.value || todayISO())}
+            />
+          </label>
+          {!isToday && (
+            <button
+              onClick={() => setViewDate(todayISO())}
+              className="rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-stone-50"
+            >
+              Aaj
+            </button>
+          )}
+        </div>
       </div>
 
-      {loading && leads.length === 0 && newCount === 0 ? (
+      {/* ---------- FUTURE / OTHER DAY PREVIEW ---------- */}
+      {!isToday ? (
+        loading && leads.length === 0 ? (
+          <p className="text-slate-500">Loading…</p>
+        ) : leads.length === 0 ? (
+          <Card>
+            <p className="text-slate-500">
+              📅 {fmtLongDate(viewDate)} ko koi follow-up scheduled nahi.
+            </p>
+          </Card>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <h2 className="text-sm font-semibold text-slate-500">
+              📅 {fmtLongDate(viewDate)} ke follow-ups ({leads.length})
+            </h2>
+            {leads.map((lead) => (
+              <Link key={lead._id} href={`/leads/${lead._id}`}>
+                <Card className="transition-colors hover:border-slate-400">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-medium">
+                        {lead.name || 'Unnamed'} <span className="text-slate-400">·</span>{' '}
+                        <span className="text-slate-600">{lead.mobileNumber}</span>
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {lead.state || '—'} · {lead.followUpCount} follow-ups · call at{' '}
+                        <strong>{fmtTime(lead.nextFollowUpDate as string)}</strong>
+                      </p>
+                    </div>
+                    <StatusBadge status={lead.status} />
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )
+      ) : /* ---------- TODAY ---------- */ loading && leads.length === 0 && newCount === 0 ? (
         <p className="text-slate-500">Loading…</p>
       ) : nothingAtAll ? (
         <Card>

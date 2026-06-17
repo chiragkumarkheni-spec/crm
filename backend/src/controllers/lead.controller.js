@@ -153,14 +153,26 @@ const listLeads = asyncHandler(async (req, res) => {
 // GET /api/leads/today-followups — leads due for follow-up today (the screen)
 // ---------------------------------------------------------------------------
 const todayFollowUps = asyncHandler(async (req, res) => {
-  // Only SCHEDULED follow-ups that are due today or overdue. Brand-new leads
-  // (no scheduled follow-up time) are NOT reminders — they are the backlog that
-  // reps work from the Leads list, so they must not flood the "Call now" alert.
+  // Only SCHEDULED follow-ups. Brand-new leads (no scheduled follow-up time) are
+  // NOT reminders — they are the backlog reps work from the Leads list, so they
+  // must not flood the "Call now" alert.
+  //
+  // Default (no ?date): due TODAY or overdue. With ?date=YYYY-MM-DD: the leads
+  // scheduled on THAT specific day — so a rep/admin can preview a future day's
+  // follow-ups (22nd, 23rd, …) without changing today's reminders.
   const filter = {
     status: { $nin: ['converted', 'lost'] },
     deleted: { $ne: true },
-    nextFollowUpDate: { $exists: true, $ne: null, $lte: endOfDay() },
   };
+  if (req.query.date) {
+    const d = new Date(req.query.date);
+    if (!isNaN(d)) {
+      filter.nextFollowUpDate = { $gte: startOfDay(d), $lte: endOfDay(d) };
+    }
+  }
+  if (!filter.nextFollowUpDate) {
+    filter.nextFollowUpDate = { $exists: true, $ne: null, $lte: endOfDay() };
+  }
   if (!isAdmin(req.user)) filter.assignedTo = req.user._id;
   else if (req.query.employee) filter.assignedTo = req.query.employee;
 
