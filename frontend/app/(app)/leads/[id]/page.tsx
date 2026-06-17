@@ -38,6 +38,8 @@ export default function LeadDetailPage() {
   const [editing, setEditing] = useState(false);
   // The follow-up whose response is being corrected (opens a popup).
   const [editingFu, setEditingFu] = useState<FollowUp | null>(null);
+  // Shows a confirmation popup after a mistaken conversion is reversed.
+  const [reverted, setReverted] = useState(false);
 
   const load = useCallback(() => {
     api
@@ -229,9 +231,7 @@ export default function LeadDetailPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {followUps.map((f) => {
-              const canEditFu =
-                f.outcome !== 'converted' &&
-                (user?.role === 'admin' || within24h(f.createdAt));
+              const canEditFu = user?.role === 'admin' || within24h(f.createdAt);
               return (
                 <Card key={f._id} className="flex flex-col gap-1">
                   <div className="flex items-center justify-between gap-2">
@@ -274,11 +274,32 @@ export default function LeadDetailPage() {
           leadId={id}
           followUp={editingFu}
           onClose={() => setEditingFu(null)}
-          onSaved={() => {
+          onSaved={(res) => {
             setEditingFu(null);
+            if (res?.revertedConversion) setReverted(true);
             load();
           }}
         />
+      )}
+
+      {reverted && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="bg-rose-600 px-5 py-3 text-center text-base font-bold text-white">
+              ↩️ Conversion wapas le li gayi
+            </div>
+            <div className="flex flex-col items-center gap-3 px-6 py-6 text-center">
+              <span className="text-5xl">🔄</span>
+              <p className="text-lg font-semibold text-slate-900">
+                Galti se hua convert undo ho gaya — ye phir se <span className="text-rose-600">LEAD</span> ban gaya.
+              </p>
+              <p className="text-sm text-slate-600">
+                Auto-bana distributor aur uska order amount hata diya gaya hai. 👍
+              </p>
+              <Button onClick={() => setReverted(false)}>Theek hai</Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -293,17 +314,21 @@ function EditFollowUpModal({
   leadId: string;
   followUp: FollowUp;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (res?: { revertedConversion?: boolean }) => void;
 }) {
-  const [outcome, setOutcome] = useState<Outcome>(followUp.outcome);
-  const [development, setDevelopment] = useState(followUp.development);
-  const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  // Conversion is done from the follow-up form, not this quick correction.
+  const wasConverted = followUp.outcome === 'converted';
+  // Conversion is done from the follow-up form, not this quick correction. So the
+  // options are the non-converted responses; a converted follow-up defaults to
+  // "In progress" (the rep then picks where to move it back to).
   const EDIT_OUTCOMES = (Object.keys(OUTCOME_LABELS) as Outcome[]).filter(
     (o) => o !== 'converted'
   );
+  const [outcome, setOutcome] = useState<Outcome>(
+    wasConverted ? 'in_progress' : followUp.outcome
+  );
+  const [development, setDevelopment] = useState(followUp.development);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   async function save() {
     setError('');
@@ -313,11 +338,11 @@ function EditFollowUpModal({
     }
     setSaving(true);
     try {
-      await api.patch(`/api/leads/${leadId}/followups/${followUp._id}`, {
-        outcome,
-        development,
-      });
-      onSaved();
+      const res = await api.patch<{ revertedConversion?: boolean }>(
+        `/api/leads/${leadId}/followups/${followUp._id}`,
+        { outcome, development }
+      );
+      onSaved(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update');
     } finally {
@@ -328,10 +353,19 @@ function EditFollowUpModal({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-        <h2 className="mb-1 text-lg font-semibold">Edit response</h2>
-        <p className="mb-4 text-xs text-slate-500">
-          Galti se galat response daal diya? 24 ghante ke andar yahan badal sakte ho.
-        </p>
+        <h2 className="mb-1 text-lg font-semibold">
+          {wasConverted ? 'Undo conversion / edit response' : 'Edit response'}
+        </h2>
+        {wasConverted ? (
+          <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            ⚠️ Ye lead converted hai. Save karne par conversion <strong>undo</strong> ho jayega — auto-bana
+            distributor aur order amount hat jayega, aur ye phir se lead ban jayegi.
+          </p>
+        ) : (
+          <p className="mb-4 text-xs text-slate-500">
+            Galti se galat response daal diya? 24 ghante ke andar yahan badal sakte ho.
+          </p>
+        )}
         {error && (
           <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
         )}

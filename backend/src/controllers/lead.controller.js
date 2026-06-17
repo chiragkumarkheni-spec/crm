@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const Lead = require('../models/Lead');
 const FollowUp = require('../models/FollowUp');
 const Distributor = require('../models/Distributor');
+const DistributorCall = require('../models/DistributorCall');
 const { startOfDay, endOfDay, isToday } = require('../utils/date');
 const { sendIntroMessage } = require('../services/whatsapp');
 const { logActivity } = require('../utils/activity');
@@ -562,39 +563,54 @@ const editFollowUp = asyncHandler(async (req, res) => {
     res.status(403);
     throw new Error('This response can only be edited within 24 hours of recording it');
   }
-  // Conversion (in or out) is handled from the follow-up form, not this quick edit.
-  if (followUp.outcome === 'converted') {
-    res.status(400);
-    throw new Error('A converted follow-up cannot be changed here');
-  }
+  // To CONVERT a lead you must use the follow-up form (it needs an order value and
+  // creates a distributor). Here you can only set a NON-converted response — which
+  // also lets you REVERSE a mistaken conversion (converted → in progress, etc.).
   const { outcome, development } = req.body;
   if (outcome !== undefined && !EDITABLE_OUTCOMES.includes(outcome)) {
     res.status(400);
     throw new Error('Pick a valid response (to convert, use the follow-up form)');
   }
+
+  const wasConverted = followUp.outcome === 'converted';
+  const revertedConversion = wasConverted && outcome && outcome !== 'converted';
+
   if (outcome) followUp.outcome = outcome;
   if (development !== undefined && development.trim()) {
     followUp.development = development.trim();
   }
+  if (revertedConversion) followUp.orderValue = undefined; // no longer a sale
   await followUp.save();
+
+  // Undo a mistaken conversion: clear the lead's conversion fields and remove the
+  // distributor that was auto-created from it (and any calls logged on it).
+  if (revertedConversion) {
+    lead.convertedAt = undefined;
+    lead.order = { value: 0, currency: lead.order?.currency || 'INR', note: '' };
+    const autoDist = await Distributor.findOne({ lead: lead._id, fromLead: true });
+    if (autoDist) {
+      await DistributorCall.deleteMany({ distributor: autoDist._id });
+      await Distributor.deleteOne({ _id: autoDist._id });
+    }
+  }
 
   // The lead's pipeline status mirrors its MOST RECENT follow-up — recompute it
   // so editing the latest response also updates the lead (older edits won't).
   const latest = await FollowUp.findOne({ lead: lead._id })
     .sort({ date: -1, createdAt: -1 })
     .lean();
-  if (latest) {
-    lead.status = latest.outcome;
-    await lead.save();
-  }
+  if (latest) lead.status = latest.outcome;
+  await lead.save();
 
   await logActivity({
     user: req.user,
-    action: 'followup_edited',
+    action: revertedConversion ? 'conversion_reverted' : 'followup_edited',
     lead,
-    detail: `response → ${followUp.outcome.replace(/_/g, ' ')}`,
+    detail: revertedConversion
+      ? `conversion undone → ${followUp.outcome.replace(/_/g, ' ')}`
+      : `response → ${followUp.outcome.replace(/_/g, ' ')}`,
   });
-  res.json({ lead, followUp });
+  res.json({ lead, followUp, revertedConversion });
 });
 
 // ---------------------------------------------------------------------------
