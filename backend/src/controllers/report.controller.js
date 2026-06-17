@@ -65,8 +65,16 @@ const summary = asyncHandler(async (req, res) => {
   else if (req.query.employee)
     monthLeadMatch.assignedTo = new mongoose.Types.ObjectId(req.query.employee);
 
+  // Distributor orders (existing-distributor order value) for the CURRENT MONTH —
+  // also always shown monthly on the rep's report screen.
+  const monthDistMatch = { date: { $gte: monthStart, $lte: monthEnd } };
+  if (!isAdmin(req.user)) monthDistMatch.employee = req.user._id;
+  else if (req.query.employee)
+    monthDistMatch.employee = new mongoose.Types.ObjectId(req.query.employee);
+
   // These run independently — in parallel instead of one-by-one.
-  const [outcomeAgg, convAgg, newLeads, cataloguesSent, distAgg, monthConvAgg] = await Promise.all([
+  const [outcomeAgg, convAgg, newLeads, cataloguesSent, distAgg, monthConvAgg, monthDistAgg] =
+    await Promise.all([
     FollowUp.aggregate([
       { $match: followMatch },
       { $group: { _id: '$outcome', count: { $sum: 1 } } },
@@ -97,11 +105,17 @@ const summary = asyncHandler(async (req, res) => {
         },
       },
     ]),
+    DistributorCall.aggregate([
+      { $match: monthDistMatch },
+      { $group: { _id: null, count: { $sum: 1 }, orderValue: { $sum: '$orderValue' } } },
+    ]),
   ]);
   const distributorCalls = distAgg[0]?.count || 0;
   const distributorOrderValue = distAgg[0]?.orderValue || 0;
   const monthlyConversions = monthConvAgg[0]?.conversions || 0;
   const monthlyOrderValue = monthConvAgg[0]?.orderValue || 0;
+  const monthlyDistributorCalls = monthDistAgg[0]?.count || 0;
+  const monthlyDistributorOrderValue = monthDistAgg[0]?.orderValue || 0;
 
   const outcomes = {
     in_progress: 0,
@@ -133,6 +147,8 @@ const summary = asyncHandler(async (req, res) => {
     distributorOrderValue,
     monthlyConversions,
     monthlyOrderValue,
+    monthlyDistributorCalls,
+    monthlyDistributorOrderValue,
   });
 });
 

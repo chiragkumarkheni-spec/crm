@@ -83,8 +83,12 @@ export default function ReportsPage() {
         <Link href="/distributor-calls" className="block">
           <StatCard
             label="Distributor orders"
-            value={summary ? formatMoney(summary.distributorOrderValue) : '—'}
-            hint="click for detail →"
+            value={
+              summary
+                ? formatMoney(isAdmin ? summary.distributorOrderValue : summary.monthlyDistributorOrderValue)
+                : '—'
+            }
+            hint={isAdmin ? 'click for detail →' : '📅 this month (monthly)'}
           />
         </Link>
       </div>

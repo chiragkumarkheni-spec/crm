@@ -143,6 +143,8 @@ export interface ReportSummary {
   distributorOrderValue: number;
   monthlyConversions: number;
   monthlyOrderValue: number;
+  monthlyDistributorCalls: number;
+  monthlyDistributorOrderValue: number;
 }
 
 export interface DistributorCallDetail {
