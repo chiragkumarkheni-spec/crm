@@ -272,6 +272,68 @@ const markSampleSent = asyncHandler(async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// DELETE /api/leads/:id/catalogue — undo a mistaken "catalogue sent" tick.
+// A rep may undo only on the same day it was marked; admins can undo anytime.
+// ---------------------------------------------------------------------------
+const unmarkCatalogueSent = asyncHandler(async (req, res) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) {
+    res.status(404);
+    throw new Error('Lead not found');
+  }
+  const owns =
+    lead.assignedTo.toString() === req.user._id.toString() ||
+    lead.createdBy.toString() === req.user._id.toString();
+  if (!isAdmin(req.user) && !owns) {
+    res.status(403);
+    throw new Error('Not your lead');
+  }
+  if (!lead.catalogue?.sent) {
+    res.status(400);
+    throw new Error('Catalogue is not marked as sent');
+  }
+  if (!isAdmin(req.user) && lead.catalogue.date && !isToday(lead.catalogue.date)) {
+    res.status(403);
+    throw new Error('Catalogue can only be un-marked on the same day it was marked');
+  }
+  lead.catalogue = { sent: false };
+  await lead.save();
+  await logActivity({ user: req.user, action: 'catalogue_unsent', lead });
+  res.json(lead);
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/leads/:id/sample — undo a mistaken "sample sent" tick.
+// A rep may undo only on the same day it was marked; admins can undo anytime.
+// ---------------------------------------------------------------------------
+const unmarkSampleSent = asyncHandler(async (req, res) => {
+  const lead = await Lead.findById(req.params.id);
+  if (!lead) {
+    res.status(404);
+    throw new Error('Lead not found');
+  }
+  const owns =
+    lead.assignedTo.toString() === req.user._id.toString() ||
+    lead.createdBy.toString() === req.user._id.toString();
+  if (!isAdmin(req.user) && !owns) {
+    res.status(403);
+    throw new Error('Not your lead');
+  }
+  if (!lead.sample?.sent) {
+    res.status(400);
+    throw new Error('No sample is marked as sent');
+  }
+  if (!isAdmin(req.user) && lead.sample.date && !isToday(lead.sample.date)) {
+    res.status(403);
+    throw new Error('Sample can only be un-marked on the same day it was marked');
+  }
+  lead.sample = { sent: false };
+  await lead.save();
+  await logActivity({ user: req.user, action: 'sample_unsent', lead });
+  res.json(lead);
+});
+
+// ---------------------------------------------------------------------------
 // POST /api/leads/:id/sample-request — record a sample the lead asked for
 // ---------------------------------------------------------------------------
 const recordSampleRequest = asyncHandler(async (req, res) => {
@@ -494,6 +556,8 @@ module.exports = {
   updateLead,
   markCatalogueSent,
   markSampleSent,
+  unmarkCatalogueSent,
+  unmarkSampleSent,
   recordSampleRequest,
   addFollowUp,
   deleteLead,

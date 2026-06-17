@@ -7,6 +7,8 @@ const {
   updateLead,
   markCatalogueSent,
   markSampleSent,
+  unmarkCatalogueSent,
+  unmarkSampleSent,
   recordSampleRequest,
   addFollowUp,
   deleteLead,
@@ -24,7 +26,9 @@ router.get('/today-followups', todayFollowUps);
 router.get('/:id', getLead);
 router.patch('/:id', updateLead);
 router.post('/:id/catalogue', markCatalogueSent);
+router.delete('/:id/catalogue', unmarkCatalogueSent);
 router.post('/:id/sample', markSampleSent);
+router.delete('/:id/sample', unmarkSampleSent);
 router.post('/:id/sample-request', recordSampleRequest);
 router.post('/:id/followups', addFollowUp);
 router.post('/:id/strong', setStrong);

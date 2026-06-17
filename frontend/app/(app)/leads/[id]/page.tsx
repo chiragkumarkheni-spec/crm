@@ -168,8 +168,17 @@ export default function LeadDetailPage() {
             await api.post(`/api/leads/${id}/catalogue`);
             load();
           }}
+          canUndo={user?.role === 'admin' || isSameDay(lead.catalogue.date)}
+          onUndo={async () => {
+            await api.delete(`/api/leads/${id}/catalogue`);
+            load();
+          }}
         />
-        <SampleCard lead={lead} onChange={load} />
+        <SampleCard
+          lead={lead}
+          onChange={load}
+          canUndo={user?.role === 'admin' || isSameDay(lead.sample.date)}
+        />
         <div className="rounded-xl border border-slate-200 bg-white p-4">
           <p className="text-sm font-medium text-slate-600">Auto WhatsApp</p>
           {lead.whatsApp.sent ? (
@@ -247,19 +256,43 @@ function ActionCard({
   date,
   actionLabel,
   onAction,
+  canUndo,
+  onUndo,
 }: {
   title: string;
   sent: boolean;
   date?: string;
   actionLabel: string;
   onAction: () => Promise<void>;
+  canUndo?: boolean;
+  onUndo?: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <p className="text-sm font-medium text-slate-600">{title}</p>
       {sent ? (
-        <p className="text-sm text-green-700 mt-1">✅ Sent {formatDate(date)}</p>
+        <div className="mt-1">
+          <p className="text-sm text-green-700">✅ Sent {formatDate(date)}</p>
+          {canUndo && onUndo && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                if (!confirm('Galti se mark hua tha? Undo karein?')) return;
+                setBusy(true);
+                try {
+                  await onUndo();
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="mt-1 text-xs font-medium text-rose-600 hover:underline disabled:opacity-50"
+            >
+              {busy ? 'Undoing…' : '↩ Undo (galti se mark hua?)'}
+            </button>
+          )}
+        </div>
       ) : (
         <Button
           variant="secondary"
@@ -281,17 +314,46 @@ function ActionCard({
   );
 }
 
-function SampleCard({ lead, onChange }: { lead: Lead; onChange: () => void }) {
+function SampleCard({
+  lead,
+  onChange,
+  canUndo,
+}: {
+  lead: Lead;
+  onChange: () => void;
+  canUndo?: boolean;
+}) {
   const [desc, setDesc] = useState('');
   const [busy, setBusy] = useState(false);
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
       <p className="text-sm font-medium text-slate-600">Sample</p>
       {lead.sample.sent ? (
-        <p className="text-sm text-green-700 mt-1">
-          ✅ Sent {formatDate(lead.sample.date)}
-          {lead.sample.description ? ` — ${lead.sample.description}` : ''}
-        </p>
+        <div className="mt-1">
+          <p className="text-sm text-green-700">
+            ✅ Sent {formatDate(lead.sample.date)}
+            {lead.sample.description ? ` — ${lead.sample.description}` : ''}
+          </p>
+          {canUndo && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                if (!confirm('Galti se mark hua tha? Undo karein?')) return;
+                setBusy(true);
+                try {
+                  await api.delete(`/api/leads/${lead._id}/sample`);
+                  onChange();
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="mt-1 text-xs font-medium text-rose-600 hover:underline disabled:opacity-50"
+            >
+              {busy ? 'Undoing…' : '↩ Undo (galti se mark hua?)'}
+            </button>
+          )}
+        </div>
       ) : (
         <div className="mt-2 flex flex-col gap-2">
           <input
