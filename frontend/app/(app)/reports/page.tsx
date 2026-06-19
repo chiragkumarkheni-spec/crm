@@ -51,6 +51,21 @@ export default function ReportsPage() {
       </Card>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {/* STRONG leads — crucial signal, prominent + clickable */}
+        <Link href="/leads?strong=true" className="block">
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm transition-colors hover:bg-amber-100">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-lg">
+              ⭐
+            </span>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm text-slate-500">Strong leads</span>
+              <span className="text-2xl font-bold text-slate-900">{summary?.strongTotal ?? '—'}</span>
+              <span className="text-xs font-medium text-amber-700">
+                aaj {summary?.strongInPeriod ?? 0} naye · dekho →
+              </span>
+            </div>
+          </div>
+        </Link>
         <StatCard label="New leads" value={summary?.newLeads ?? '—'} hint="period" />
         <StatCard
           label="Total calls"
@@ -125,6 +140,7 @@ export default function ReportsPage() {
                 <th className="px-3 py-3 font-medium">Total calls</th>
                 <th className="px-3 py-3 font-medium">Lead / Distr</th>
                 <th className="px-3 py-3 font-medium">Catalogue</th>
+                <th className="px-3 py-3 font-medium">⭐ Strong</th>
                 <th className="px-3 py-3 font-medium">Converted</th>
                 <th className="px-3 py-3 font-medium">Total sales</th>
                 <th className="px-3 py-3 font-medium">Leads (total / in-prog)</th>
@@ -148,6 +164,17 @@ export default function ReportsPage() {
                     </Link>
                   </td>
                   <td className="px-3 py-3 text-slate-600">{r.cataloguesSent}</td>
+                  <td className="px-3 py-3">
+                    <Link
+                      href={`/leads?employee=${r.employee._id}&strong=true&name=${encodeURIComponent(r.employee.name || '')}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-700 hover:bg-amber-200"
+                    >
+                      ⭐ {r.strongTotal}
+                      {r.strongNew > 0 && (
+                        <span className="text-[10px] font-semibold text-amber-600">+{r.strongNew} aaj</span>
+                      )}
+                    </Link>
+                  </td>
                   <td className="px-3 py-3 font-medium text-green-700">{r.conversions}</td>
                   <td className="px-3 py-3 font-bold text-green-700">{formatMoney(r.totalSales)}</td>
                   <td className="px-3 py-3 text-slate-600">
@@ -165,7 +192,7 @@ export default function ReportsPage() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                     No reps with leads or activity yet.
                   </td>
                 </tr>

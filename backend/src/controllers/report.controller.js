@@ -60,6 +60,19 @@ const summary = asyncHandler(async (req, res) => {
   else if (req.query.employee)
     distMatch.employee = new mongoose.Types.ObjectId(req.query.employee);
 
+  // STRONG leads — a crucial business signal. Total currently held + newly marked
+  // strong in the selected period (daily by default).
+  const strongMatch = { strong: true, deleted: { $ne: true } };
+  const strongPeriodMatch = { strong: true, deleted: { $ne: true }, strongAt: { $gte: from, $lte: to } };
+  if (!isAdmin(req.user)) {
+    strongMatch.assignedTo = req.user._id;
+    strongPeriodMatch.assignedTo = req.user._id;
+  } else if (req.query.employee) {
+    const oid = new mongoose.Types.ObjectId(req.query.employee);
+    strongMatch.assignedTo = oid;
+    strongPeriodMatch.assignedTo = oid;
+  }
+
   // Converted-as-distributor + order value for the CURRENT MONTH — always shown
   // monthly (regardless of the daily/range filter) on the rep's report screen.
   const monthStart = startOfMonth();
@@ -77,8 +90,17 @@ const summary = asyncHandler(async (req, res) => {
     monthDistMatch.employee = new mongoose.Types.ObjectId(req.query.employee);
 
   // These run independently — in parallel instead of one-by-one.
-  const [outcomeAgg, convAgg, newLeads, cataloguesSent, distAgg, monthConvAgg, monthDistAgg] =
-    await Promise.all([
+  const [
+    outcomeAgg,
+    convAgg,
+    newLeads,
+    cataloguesSent,
+    distAgg,
+    monthConvAgg,
+    monthDistAgg,
+    strongTotal,
+    strongInPeriod,
+  ] = await Promise.all([
     FollowUp.aggregate([
       { $match: followMatch },
       { $group: { _id: '$outcome', count: { $sum: 1 } } },
@@ -113,6 +135,8 @@ const summary = asyncHandler(async (req, res) => {
       { $match: monthDistMatch },
       { $group: { _id: null, count: { $sum: 1 }, orderValue: { $sum: '$orderValue' } } },
     ]),
+    Lead.countDocuments(strongMatch),
+    Lead.countDocuments(strongPeriodMatch),
   ]);
   const distributorCalls = distAgg[0]?.count || 0;
   const distributorOrderValue = distAgg[0]?.orderValue || 0;
@@ -153,6 +177,8 @@ const summary = asyncHandler(async (req, res) => {
     monthlyOrderValue,
     monthlyDistributorCalls,
     monthlyDistributorOrderValue,
+    strongTotal,
+    strongInPeriod,
   });
 });
 
@@ -167,7 +193,7 @@ const byEmployee = asyncHandler(async (req, res) => {
   //  - calls/outcomes (follow-ups) within the selected period
   //  - conversions + order value (leads converted) within the period
   //  - lead INVENTORY per rep (all-time, status-wise: how many leads each holds)
-  const [calls, conv, leadInv, distCalls, catRange] = await Promise.all([
+  const [calls, conv, leadInv, distCalls, catRange, strongAgg] = await Promise.all([
     FollowUp.aggregate([
       { $match: { date: { $gte: from, $lte: to } } },
       {
@@ -228,11 +254,27 @@ const byEmployee = asyncHandler(async (req, res) => {
       },
       { $group: { _id: '$assignedTo', c: { $sum: 1 } } },
     ]),
+    // STRONG leads per rep: total currently held + newly marked in the period.
+    Lead.aggregate([
+      { $match: { strong: true, deleted: { $ne: true } } },
+      {
+        $group: {
+          _id: '$assignedTo',
+          total: { $sum: 1 },
+          inPeriod: {
+            $sum: {
+              $cond: [{ $and: [{ $gte: ['$strongAt', from] }, { $lte: ['$strongAt', to] }] }, 1, 0],
+            },
+          },
+        },
+      },
+    ]),
   ]);
   const convMap = new Map(conv.map((c) => [String(c._id), c]));
   const invMap = new Map(leadInv.map((c) => [String(c._id), c]));
   const distMap = new Map(distCalls.map((c) => [String(c._id), c]));
   const catMap = new Map(catRange.map((c) => [String(c._id), c.c]));
+  const strongMap = new Map(strongAgg.map((c) => [String(c._id), c]));
 
   // The report is rep-wise: show every active EMPLOYEE (even with zero leads),
   // plus any lead owner. Admins are not reps, so they don't get a row.
@@ -287,6 +329,9 @@ const byEmployee = asyncHandler(async (req, res) => {
       totalAllCalls: (c.totalCalls || 0) + ((distMap.get(id) || {}).distributorCalls || 0),
       totalSales:
         (cv.orderValue || 0) + ((distMap.get(id) || {}).distributorOrderValue || 0),
+      // STRONG leads — crucial signal: total held + newly marked in the period.
+      strongTotal: (strongMap.get(id) || {}).total || 0,
+      strongNew: (strongMap.get(id) || {}).inPeriod || 0,
     };
   });
 

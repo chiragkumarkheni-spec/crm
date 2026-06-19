@@ -147,6 +147,8 @@ export interface ReportSummary {
   monthlyOrderValue: number;
   monthlyDistributorCalls: number;
   monthlyDistributorOrderValue: number;
+  strongTotal: number;
+  strongInPeriod: number;
 }
 
 export interface DistributorCallDetail {
@@ -182,6 +184,8 @@ export interface EmployeeReportRow {
   distributorOrderValue: number;
   totalAllCalls: number;
   totalSales: number;
+  strongTotal: number;
+  strongNew: number;
 }
 
 export const OUTCOME_LABELS: Record<Outcome, string> = {

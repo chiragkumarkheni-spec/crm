@@ -38,8 +38,8 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* ===== HIGHLIGHTS — the two most important numbers, merged ===== */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* ===== HIGHLIGHTS — the most important numbers ===== */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 p-5 text-white shadow-sm">
           <div className="flex items-center gap-2 text-sm font-medium text-white/90">
             <IconPhone className="h-5 w-5" /> Aaj ke total calls
@@ -61,6 +61,20 @@ export default function DashboardPage() {
             {formatMoney(summary?.monthlyDistributorOrderValue ?? 0)}
           </p>
         </div>
+        {/* STRONG leads — crucial business signal */}
+        <Link href="/leads?strong=true" className="block">
+          <div className="rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 p-5 text-white shadow-sm transition-transform hover:scale-[1.01]">
+            <div className="flex items-center gap-2 text-sm font-medium text-white/90">
+              ⭐ Strong leads
+            </div>
+            <p className="mt-1 text-4xl font-extrabold tracking-tight">
+              {summary?.strongTotal ?? '—'}
+            </p>
+            <p className="mt-1 text-xs text-white/90">
+              aaj {summary?.strongInPeriod ?? 0} naye strong · dekhne ke liye click →
+            </p>
+          </div>
+        </Link>
       </div>
 
       <Card className="flex items-center justify-between bg-slate-900 text-white">

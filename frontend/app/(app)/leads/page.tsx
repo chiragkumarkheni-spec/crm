@@ -41,6 +41,7 @@ export default function LeadsPage() {
     const sp = new URLSearchParams(window.location.search);
     setEmployeeId(sp.get('employee'));
     setEmployeeName(sp.get('name') || '');
+    if (sp.get('strong') === 'true') setTab('strong');
   }, []);
 
   function clearRepFilter() {
