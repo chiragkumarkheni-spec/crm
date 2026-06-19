@@ -44,8 +44,12 @@ const summary = asyncHandler(async (req, res) => {
   else if (req.query.employee)
     newLeadMatch.assignedTo = new mongoose.Types.ObjectId(req.query.employee);
 
-  // Catalogues sent (all-time count of leads marked catalogue-sent).
-  const catalogueMatch = { 'catalogue.sent': true, deleted: { $ne: true } };
+  // Catalogues sent IN RANGE (daily by default) — all-time count was useless.
+  const catalogueMatch = {
+    'catalogue.sent': true,
+    deleted: { $ne: true },
+    'catalogue.date': { $gte: from, $lte: to },
+  };
   if (!isAdmin(req.user)) catalogueMatch.assignedTo = req.user._id;
   else if (req.query.employee)
     catalogueMatch.assignedTo = new mongoose.Types.ObjectId(req.query.employee);
@@ -163,7 +167,7 @@ const byEmployee = asyncHandler(async (req, res) => {
   //  - calls/outcomes (follow-ups) within the selected period
   //  - conversions + order value (leads converted) within the period
   //  - lead INVENTORY per rep (all-time, status-wise: how many leads each holds)
-  const [calls, conv, leadInv, distCalls] = await Promise.all([
+  const [calls, conv, leadInv, distCalls, catRange] = await Promise.all([
     FollowUp.aggregate([
       { $match: { date: { $gte: from, $lte: to } } },
       {
@@ -213,10 +217,22 @@ const byEmployee = asyncHandler(async (req, res) => {
         },
       },
     ]),
+    // Catalogues sent IN RANGE (daily by default) — by the lead's owner.
+    Lead.aggregate([
+      {
+        $match: {
+          'catalogue.sent': true,
+          'catalogue.date': { $gte: from, $lte: to },
+          deleted: { $ne: true },
+        },
+      },
+      { $group: { _id: '$assignedTo', c: { $sum: 1 } } },
+    ]),
   ]);
   const convMap = new Map(conv.map((c) => [String(c._id), c]));
   const invMap = new Map(leadInv.map((c) => [String(c._id), c]));
   const distMap = new Map(distCalls.map((c) => [String(c._id), c]));
+  const catMap = new Map(catRange.map((c) => [String(c._id), c.c]));
 
   // The report is rep-wise: show every active EMPLOYEE (even with zero leads),
   // plus any lead owner. Admins are not reps, so they don't get a row.
@@ -252,7 +268,8 @@ const byEmployee = asyncHandler(async (req, res) => {
       leadsInProgress: inv.leadsInProgress || 0,
       leadsConverted: inv.leadsConverted || 0,
       leadsLost: inv.leadsLost || 0,
-      cataloguesSent: inv.cataloguesSent || 0,
+      // Catalogues sent in the SELECTED PERIOD (daily by default) — not all-time.
+      cataloguesSent: catMap.get(id) || 0,
       // Activity (selected period)
       totalCalls: c.totalCalls || 0,
       no_pickup: c.no_pickup || 0,
@@ -264,6 +281,12 @@ const byEmployee = asyncHandler(async (req, res) => {
       orderValue: cv.orderValue || 0,
       distributorCalls: (distMap.get(id) || {}).distributorCalls || 0,
       distributorOrderValue: (distMap.get(id) || {}).distributorOrderValue || 0,
+      // Merged headline numbers (mirror the rep's dashboard):
+      //  - all calls = lead follow-up calls + distributor calls
+      //  - total sales = converted-lead order value + distributor order value
+      totalAllCalls: (c.totalCalls || 0) + ((distMap.get(id) || {}).distributorCalls || 0),
+      totalSales:
+        (cv.orderValue || 0) + ((distMap.get(id) || {}).distributorOrderValue || 0),
     };
   });
 

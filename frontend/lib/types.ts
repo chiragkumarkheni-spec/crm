@@ -180,6 +180,8 @@ export interface EmployeeReportRow {
   orderValue: number;
   distributorCalls: number;
   distributorOrderValue: number;
+  totalAllCalls: number;
+  totalSales: number;
 }
 
 export const OUTCOME_LABELS: Record<Outcome, string> = {

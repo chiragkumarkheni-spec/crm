@@ -7,8 +7,8 @@ import { useAuth } from '@/lib/auth';
 import { useApiData } from '@/lib/useApiData';
 import type { User } from '@/lib/types';
 import { OUTCOME_LABELS, DISTRIBUTOR_CATEGORIES } from '@/lib/types';
-import { Card, inputClass } from '@/components/ui';
-import { formatDateTime, formatMoney } from '@/lib/format';
+import { inputClass } from '@/components/ui';
+import { formatMoney } from '@/lib/format';
 
 type RepCall = {
   _id: string;
@@ -35,8 +35,14 @@ export default function RepCallsPage() {
       .then((list) => {
         const emps = list.filter((u) => u.role === 'employee' && u.active !== false);
         setEmployees(emps);
-        setRepA((p) => p || emps[0]?._id || '');
-        setRepB((p) => p || emps[1]?._id || emps[0]?._id || '');
+        // Default to ABHIKORAT (left) and PIYUSH (right) if present; admin can
+        // change either side from the dropdowns.
+        const byName = (frag: string) =>
+          emps.find((u) => (u.name || '').toLowerCase().includes(frag));
+        const a = byName('abhi') || emps[0];
+        const b = byName('piyush') || emps[1] || emps[0];
+        setRepA((p) => p || a?._id || '');
+        setRepB((p) => p || b?._id || '');
       })
       .catch(() => {});
   }, []);
@@ -120,7 +126,7 @@ function RepColumn({
       ) : items.length === 0 ? (
         <p className="px-1 text-sm text-slate-400">Is rep ka koi call log nahi.</p>
       ) : (
-        <div className="flex max-h-[70vh] flex-col gap-2 overflow-y-auto pr-1">
+        <div className="max-h-[74vh] divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-100">
           {items.map((c) => (
             <CallRow key={c._id} call={c} />
           ))}
@@ -130,6 +136,16 @@ function RepColumn({
   );
 }
 
+function fmtShort(d: string) {
+  return new Date(d).toLocaleString([], {
+    day: '2-digit',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+// Compact, activity-style single-line entry so many calls fit on one screen.
 function CallRow({ call }: { call: RepCall }) {
   const isLead = call.kind === 'lead';
   const label = isLead
@@ -142,42 +158,40 @@ function CallRow({ call }: { call: RepCall }) {
     : null;
 
   const inner = (
-    <Card className="flex flex-col gap-1 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 font-medium">
-          <span
-            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-              isLead ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-            }`}
-          >
-            {isLead ? 'LEAD' : 'DISTR'}
+    <div className="flex items-start gap-2 px-2 py-1 hover:bg-stone-50">
+      <span
+        className={`mt-0.5 shrink-0 rounded px-1 text-[9px] font-bold leading-4 ${
+          isLead ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+        }`}
+      >
+        {isLead ? 'L' : 'D'}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="truncate text-xs font-semibold text-slate-800">
+            {call.name}
+            <span className="font-normal text-slate-500"> · {label}</span>
+            {call.orderValue > 0 && (
+              <span className="font-medium text-green-700"> · 💰{formatMoney(call.orderValue)}</span>
+            )}
           </span>
-          {call.name}
-        </span>
-        <span className="whitespace-nowrap text-xs text-slate-400">
-          {formatDateTime(call.date)}
-        </span>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-        <span className="rounded-full bg-stone-100 px-2 py-0.5 font-medium text-slate-700">
-          {label}
-        </span>
-        {call.mobile && <span className="text-slate-400">{call.mobile}</span>}
-        {!isLead && call.direction && (
-          <span className="text-slate-400">· {call.direction}</span>
-        )}
-        {call.orderValue > 0 && (
-          <span className="font-medium text-green-700">💰 {formatMoney(call.orderValue)}</span>
+          <span className="shrink-0 text-[10px] text-slate-400">{fmtShort(call.date)}</span>
+        </div>
+        {call.note && (
+          <div
+            className="truncate text-[11px] leading-snug text-slate-500"
+            dangerouslySetInnerHTML={{ __html: call.note }}
+          />
         )}
       </div>
-      {call.note && (
-        <div
-          className="text-sm text-slate-600"
-          dangerouslySetInnerHTML={{ __html: call.note }}
-        />
-      )}
-    </Card>
+    </div>
   );
 
-  return href ? <Link href={href}>{inner}</Link> : inner;
+  return href ? (
+    <Link href={href} className="block">
+      {inner}
+    </Link>
+  ) : (
+    inner
+  );
 }
