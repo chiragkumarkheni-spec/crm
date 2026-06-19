@@ -56,6 +56,11 @@ const updateUser = asyncHandler(async (req, res) => {
   if (role !== undefined) user.role = role === 'admin' ? 'admin' : 'employee';
   if (active !== undefined) user.active = !!active;
   if (password) await user.setPassword(password);
+  // Reset the device lock so the rep can bind a new PC on their next login.
+  if (req.body.resetDevice) {
+    user.deviceId = null;
+    user.deviceBoundAt = undefined;
+  }
   await user.save();
   res.json(user);
 });

@@ -264,6 +264,44 @@ function ManageUserModal({
               onChange={(e) => setPassword(e.target.value)}
             />
           </Field>
+
+          {/* Device lock — rep ek hi PC se login kar sakta hai */}
+          {target.role === 'employee' && (
+            <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+              <p className="text-sm font-medium text-slate-700">
+                💻 Device lock —{' '}
+                {target.deviceId ? (
+                  <span className="text-green-700">PC se locked (sirf usi PC pe login)</span>
+                ) : (
+                  <span className="text-amber-700">abhi koi PC bound nahi (agla login bind karega)</span>
+                )}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                PC badal gaya ya naye PC pe login chahiye? Lock reset karo — agla login naye PC ko bind karega.
+              </p>
+              <Button
+                variant="secondary"
+                className="mt-2"
+                disabled={saving || !target.deviceId}
+                onClick={async () => {
+                  setError('');
+                  setSaving(true);
+                  try {
+                    await api.patch(`/api/users/${target._id}`, { resetDevice: true });
+                    setDone('✅ Device lock reset ho gaya. Ab rep kisi bhi PC pe pehla login karke usko bind kar sakta hai.');
+                    setTimeout(onSaved, 1200);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'Failed to reset device');
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+              >
+                🔓 Reset device lock
+              </Button>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose} disabled={saving}>
               Cancel

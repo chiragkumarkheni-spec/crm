@@ -6,6 +6,8 @@ export interface User {
   email: string;
   role: Role;
   active: boolean;
+  deviceId?: string | null;
+  deviceBoundAt?: string;
   deleted?: boolean;
   deletedAt?: string;
   createdAt?: string;

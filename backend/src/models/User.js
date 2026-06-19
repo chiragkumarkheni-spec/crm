@@ -18,6 +18,11 @@ const userSchema = new mongoose.Schema(
       default: 'employee',
     },
     active: { type: Boolean, default: true },
+    // Device lock (employees only): a rep's login is bound to ONE PC. The first
+    // successful login stores that PC's deviceId; afterwards only that PC can log
+    // in. Admin can reset it (clear deviceId) when the rep moves to a new PC.
+    deviceId: { type: String, default: null },
+    deviceBoundAt: { type: Date },
     // Soft delete: a "deleted" user is moved to the Recycle Bin (hidden from
     // the main list and unable to log in) but never removed from the database.
     deleted: { type: Boolean, default: false },

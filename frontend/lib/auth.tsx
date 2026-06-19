@@ -26,6 +26,21 @@ const AuthContext = createContext<AuthState | undefined>(undefined);
 // from the JWT, so a tampered cached user cannot grant any real access — it is
 // corrected the moment the background revalidation below runs.
 const USER_KEY = 'nexton_user';
+const DEVICE_KEY = 'nexton_device';
+
+// A stable per-PC id kept in this browser's localStorage. A rep's account binds
+// to it on first login, so the login then works only from this one PC.
+function getDeviceId(): string {
+  if (typeof window === 'undefined') return '';
+  let id = localStorage.getItem(DEVICE_KEY);
+  if (!id) {
+    id =
+      (typeof crypto !== 'undefined' && crypto.randomUUID && crypto.randomUUID()) ||
+      `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(DEVICE_KEY, id);
+  }
+  return id;
+}
 
 function readCachedUser(): User | null {
   if (typeof window === 'undefined') return null;
@@ -81,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(email: string, password: string) {
     const data = await api.post<{ token: string; user: User }>(
       '/api/auth/login',
-      { email, password }
+      { email, password, deviceId: getDeviceId() }
     );
     setToken(data.token);
     writeCachedUser(data.user);
