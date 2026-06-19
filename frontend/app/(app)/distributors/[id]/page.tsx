@@ -3,18 +3,27 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import type { Distributor, DistributorCall, User } from '@/lib/types';
 import { DISTRIBUTOR_CATEGORIES } from '@/lib/types';
+
+// A logged call can be corrected within 24 hours (admins anytime).
+function within24h(iso?: string): boolean {
+  if (!iso) return false;
+  return (Date.now() - new Date(iso).getTime()) / 3600000 <= 24;
+}
 import { Card, Button, Field, inputClass } from '@/components/ui';
 import { RichNote } from '@/components/RichNote';
 import { formatDateTime, formatMoney, todayISO } from '@/lib/format';
 
 export default function DistributorDetailPage() {
   const params = useParams<{ id: string }>();
+  const { user } = useAuth();
   const id = params.id;
   const [distributor, setDistributor] = useState<Distributor | null>(null);
   const [calls, setCalls] = useState<DistributorCall[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingCall, setEditingCall] = useState<DistributorCall | null>(null);
 
   const load = useCallback(() => {
     api
@@ -117,14 +126,27 @@ export default function DistributorDetailPage() {
           <p className="text-sm text-slate-500">Abhi koi call log nahi.</p>
         ) : (
           <div className="flex flex-col gap-2">
-            {calls.map((c) => (
+            {calls.map((c) => {
+              const canEdit = user?.role === 'admin' || within24h(c.createdAt);
+              return (
               <Card key={c._id} className="flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium">
                     {DISTRIBUTOR_CATEGORIES[c.category] || c.category}{' '}
                     <span className="text-xs font-normal text-slate-400">· {c.direction}</span>
                   </span>
-                  <span className="text-xs text-slate-400">{formatDateTime(c.date)}</span>
+                  <div className="flex items-center gap-3">
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingCall(c)}
+                        className="text-xs font-medium text-brand-600 hover:underline"
+                      >
+                        ✏️ Edit
+                      </button>
+                    )}
+                    <span className="text-xs text-slate-400">{formatDateTime(c.date)}</span>
+                  </div>
                 </div>
                 {!!c.orderValue && (
                   <p className="text-sm font-medium text-green-700">
@@ -141,9 +163,127 @@ export default function DistributorDetailPage() {
                   <p className="text-xs text-slate-400">by {(c.employee as User).name}</p>
                 )}
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
+      </div>
+
+      {editingCall && (
+        <EditDistCallModal
+          distributorId={id}
+          call={editingCall}
+          onClose={() => setEditingCall(null)}
+          onSaved={() => {
+            setEditingCall(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditDistCallModal({
+  distributorId,
+  call,
+  onClose,
+  onSaved,
+}: {
+  distributorId: string;
+  call: DistributorCall;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [category, setCategory] = useState(call.category);
+  const [direction, setDirection] = useState<'incoming' | 'outgoing'>(call.direction);
+  const [orderValue, setOrderValue] = useState(call.orderValue ? String(call.orderValue) : '');
+  const [note, setNote] = useState(call.note || '');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setError('');
+    setSaving(true);
+    try {
+      await api.patch(`/api/distributors/${distributorId}/calls/${call._id}`, {
+        category,
+        direction,
+        note,
+        orderValue: category === 'new_order' && orderValue ? Number(orderValue) : 0,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update call');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+        <h2 className="mb-1 text-lg font-semibold">Edit call</h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Galti se galat reason / order / note? 24 ghante ke andar yahan theek karo.
+        </p>
+        {error && (
+          <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
+        )}
+        <div className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Reason">
+              <select
+                className={inputClass}
+                value={category}
+                onChange={(e) => {
+                  const c = e.target.value;
+                  setCategory(c);
+                  if (c !== 'new_order') setOrderValue('');
+                }}
+              >
+                {Object.entries(DISTRIBUTOR_CATEGORIES).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Call type">
+              <select
+                className={inputClass}
+                value={direction}
+                onChange={(e) => setDirection(e.target.value as 'incoming' | 'outgoing')}
+              >
+                <option value="incoming">Incoming</option>
+                <option value="outgoing">Outgoing</option>
+              </select>
+            </Field>
+            {category === 'new_order' && (
+              <Field label="Order value (₹)">
+                <input
+                  type="number"
+                  min="0"
+                  className={inputClass}
+                  value={orderValue}
+                  onChange={(e) => setOrderValue(e.target.value)}
+                  placeholder="0"
+                />
+              </Field>
+            )}
+          </div>
+          <Field label="Note">
+            <RichNote value={note} onChange={setNote} />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save changes'}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

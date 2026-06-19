@@ -146,6 +146,76 @@ const addDistributorCall = asyncHandler(async (req, res) => {
   res.status(201).json(call);
 });
 
+// PATCH /api/distributors/:id/calls/:callId — correct a logged call within 24h.
+//   A rep can fix the reason / call type / order amount / note for 24 hours;
+//   admins anytime. The distributor's running order total is adjusted by the
+//   change in order amount.
+function within24h(date) {
+  if (!date) return false;
+  return (Date.now() - new Date(date).getTime()) / 3600000 <= 24;
+}
+
+const editDistributorCall = asyncHandler(async (req, res) => {
+  const distributor = await Distributor.findById(req.params.id);
+  if (!distributor) {
+    res.status(404);
+    throw new Error('Distributor not found');
+  }
+  const call = await DistributorCall.findOne({
+    _id: req.params.callId,
+    distributor: distributor._id,
+  });
+  if (!call) {
+    res.status(404);
+    throw new Error('Call not found');
+  }
+  const owns =
+    call.employee.toString() === req.user._id.toString() ||
+    distributor.assignedTo.toString() === req.user._id.toString();
+  if (!isAdmin(req.user) && !owns) {
+    res.status(403);
+    throw new Error('Not your call');
+  }
+  if (!isAdmin(req.user) && !within24h(call.createdAt)) {
+    res.status(403);
+    throw new Error('Ye call sirf 24 ghante ke andar edit ho sakti hai');
+  }
+
+  const { category, direction, note, orderValue } = req.body;
+  if (category !== undefined) call.category = category;
+  if (direction !== undefined) {
+    call.direction = direction === 'outgoing' ? 'outgoing' : 'incoming';
+  }
+  if (note !== undefined) call.note = sanitizeNote(note);
+
+  // Order amount only applies to a "New order"; adjust the distributor's running
+  // total by the difference (old → new).
+  const oldAmount = call.orderValue || 0;
+  let newAmount = oldAmount;
+  if (orderValue !== undefined || category !== undefined) {
+    newAmount =
+      call.category === 'new_order' && Number(orderValue) > 0 ? Number(orderValue) : 0;
+    call.orderValue = newAmount;
+  }
+  await call.save();
+
+  if (newAmount !== oldAmount) {
+    distributor.totalOrderValue = Math.max(
+      0,
+      (distributor.totalOrderValue || 0) - oldAmount + newAmount
+    );
+    await distributor.save();
+  }
+
+  await logActivity({
+    user: req.user,
+    action: 'distributor_call_edited',
+    leadName: distributor.name,
+    detail: `${call.category.replace(/_/g, ' ')}${newAmount ? ` · ₹${newAmount}` : ''}`,
+  });
+  res.json(call);
+});
+
 // GET /api/distributors/today-followups — distributors due for a follow-up
 // today or overdue (their OWN pipeline, separate from leads).
 const distributorFollowUps = asyncHandler(async (req, res) => {
@@ -167,5 +237,6 @@ module.exports = {
   listDistributors,
   getDistributor,
   addDistributorCall,
+  editDistributorCall,
   distributorFollowUps,
 };
