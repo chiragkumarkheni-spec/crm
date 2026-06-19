@@ -3,6 +3,7 @@ const Distributor = require('../models/Distributor');
 const DistributorCall = require('../models/DistributorCall');
 const { logActivity } = require('../utils/activity');
 const { endOfDay } = require('../utils/date');
+const { sanitizeNote } = require('../utils/sanitize');
 
 const isAdmin = (user) => user.role === 'admin';
 
@@ -120,7 +121,7 @@ const addDistributorCall = asyncHandler(async (req, res) => {
     employee: req.user._id,
     category,
     direction: direction === 'outgoing' ? 'outgoing' : 'incoming',
-    note: note ? String(note).trim() : '',
+    note: sanitizeNote(note),
     orderValue: amount,
     date: new Date(),
   });
@@ -140,7 +141,7 @@ const addDistributorCall = asyncHandler(async (req, res) => {
     detail:
       `${category.replace(/_/g, ' ')}` +
       `${amount ? ` · ₹${amount}` : ''}` +
-      `${note ? ' · ' + note : ''}`,
+      `${call.note ? ' · ' + call.note.replace(/<[^>]*>/g, '') : ''}`,
   });
   res.status(201).json(call);
 });

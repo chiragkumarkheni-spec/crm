@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import type { Distributor, DistributorCall, User } from '@/lib/types';
 import { DISTRIBUTOR_CATEGORIES } from '@/lib/types';
 import { Card, Button, Field, inputClass } from '@/components/ui';
+import { RichNote } from '@/components/RichNote';
 import { formatDateTime, formatMoney, todayISO } from '@/lib/format';
 
 export default function DistributorDetailPage() {
@@ -75,7 +76,40 @@ export default function DistributorDetailPage() {
         </span>
       </Card>
 
-      <LogCallForm distributorId={id} onSaved={load} />
+      {/* ★ Last call, highlighted — rep ko pichli baat turant dikhe */}
+      {calls[0] && (
+        <div className="rounded-2xl border-l-4 border-l-green-500 bg-green-50/60 p-4 shadow-sm">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-xs font-bold uppercase tracking-wide text-green-700">
+              ★ Last call — pichli baat
+            </span>
+            <span className="text-xs text-slate-500">{formatDateTime(calls[0].date)}</span>
+          </div>
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+            <span className="rounded-full bg-white px-2.5 py-0.5 font-medium text-slate-700">
+              {DISTRIBUTOR_CATEGORIES[calls[0].category] || calls[0].category}
+            </span>
+            <span className="text-xs text-slate-500">· {calls[0].direction}</span>
+            {!!calls[0].orderValue && (
+              <span className="font-medium text-green-700">💰 {formatMoney(calls[0].orderValue)}</span>
+            )}
+            {typeof calls[0].employee === 'object' && (
+              <span className="text-xs text-slate-500">by {(calls[0].employee as User).name}</span>
+            )}
+          </div>
+          {calls[0].note && (
+            <div
+              className="text-[15px] leading-relaxed text-slate-800"
+              dangerouslySetInnerHTML={{ __html: calls[0].note }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Log the next call — prominent, easy to fill */}
+      <div className="rounded-2xl border-2 border-green-400 bg-white shadow-sm">
+        <LogCallForm distributorId={id} onSaved={load} />
+      </div>
 
       <div>
         <h2 className="mb-3 font-semibold">Call history ({calls.length})</h2>
@@ -97,7 +131,12 @@ export default function DistributorDetailPage() {
                     💰 Order: {formatMoney(c.orderValue)}
                   </p>
                 )}
-                {c.note && <p className="text-sm text-slate-700">{c.note}</p>}
+                {c.note && (
+                  <div
+                    className="text-sm text-slate-700"
+                    dangerouslySetInnerHTML={{ __html: c.note }}
+                  />
+                )}
                 {typeof c.employee === 'object' && (
                   <p className="text-xs text-slate-400">by {(c.employee as User).name}</p>
                 )}
@@ -207,12 +246,10 @@ function LogCallForm({ distributorId, onSaved }: { distributorId: string; onSave
             </Field>
           )}
         </div>
-        <Field label="Note (optional)">
-          <textarea
-            className={inputClass}
-            rows={2}
+        <Field label="Note — highlight/font se important baat ubhaaro">
+          <RichNote
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={setNote}
             placeholder="e.g. 500 ltr ka naya order; payment 15 din me."
           />
         </Field>
