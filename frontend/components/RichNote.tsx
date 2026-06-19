@@ -15,17 +15,26 @@ export function RichNote({
   placeholder?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // The HTML we last sent up. We compare against THIS (not the live DOM) so that
+  // while the rep is typing we NEVER rewrite the editor — rewriting innerHTML on
+  // each keystroke is what was breaking typing (caret jumped / IME reset). We only
+  // overwrite when `value` is changed from OUTSIDE (e.g. the outcome auto-fill or
+  // opening the edit popup), which produces a value different from what we emitted.
+  const lastEmitted = useRef<string | null>(null); // null until first sync (mount)
 
-  // Sync the editor when the value is set from OUTSIDE (e.g. the outcome auto-fill
-  // or opening the edit popup). We only overwrite when it differs from what is
-  // shown, so we never clobber the caret while the rep is typing.
   useEffect(() => {
     const el = ref.current;
-    if (el && el.innerHTML !== value) el.innerHTML = value || '';
+    if (el && (value || '') !== lastEmitted.current) {
+      el.innerHTML = value || '';
+      lastEmitted.current = value || '';
+    }
   }, [value]);
 
   function emit() {
-    if (ref.current) onChange(ref.current.innerHTML);
+    if (ref.current) {
+      lastEmitted.current = ref.current.innerHTML;
+      onChange(ref.current.innerHTML);
+    }
   }
 
   function wrap(style: Partial<CSSStyleDeclaration>) {
