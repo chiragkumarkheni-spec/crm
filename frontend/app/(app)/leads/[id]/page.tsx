@@ -62,6 +62,8 @@ export default function LeadDetailPage() {
   const assignedName =
     typeof lead.assignedTo === 'object' ? (lead.assignedTo as User).name : '';
   const isClosed = lead.status === 'converted' || lead.status === 'lost';
+  // followUps is newest-first → [0] is the most recent follow-up (last talk).
+  const latest = followUps[0];
 
   // Edit window: rep can edit for 36h after creation, admin for 100h, then nobody.
   const editWindowHrs = user?.role === 'admin' ? 100 : 36;
@@ -168,6 +170,48 @@ export default function LeadDetailPage() {
         </Card>
       )}
 
+      {/* ===== FOLLOW-UP — the most important part of this page ===== */}
+      {/* Last follow-up, highlighted: rep ko pichli baat turant dikhe */}
+      {latest && (
+        <div className="rounded-2xl border-l-4 border-l-brand-500 bg-brand-50/60 p-4 shadow-sm">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-xs font-bold uppercase tracking-wide text-brand-700">
+              ★ Last follow-up — pichli baat
+            </span>
+            <span className="text-xs text-slate-500">{formatDateTime(latest.date)}</span>
+          </div>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <StatusBadge status={latest.outcome} />
+            {latest.nextFollowUpDate && (
+              <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+                Next: {formatDate(latest.nextFollowUpDate)}
+              </span>
+            )}
+            {typeof latest.employee === 'object' && (
+              <span className="text-xs text-slate-500">by {(latest.employee as User).name}</span>
+            )}
+          </div>
+          <div
+            className="text-[15px] leading-relaxed text-slate-800"
+            dangerouslySetInnerHTML={{ __html: latest.development }}
+          />
+        </div>
+      )}
+
+      {/* Record the NEXT follow-up — prominent, easy to fill */}
+      {!isClosed ? (
+        <div className="rounded-2xl border-2 border-brand-400 bg-white shadow-sm">
+          <FollowUpForm leadId={id} onSaved={() => router.push('/follow-ups')} />
+        </div>
+      ) : (
+        <Card>
+          <p className="text-slate-500">
+            This lead is {lead.status === 'converted' ? 'converted 🎉' : 'closed'} — the inquiry
+            has ended.
+          </p>
+        </Card>
+      )}
+
       {/* Action flags: catalogue / sample / whatsapp */}
       <div className="grid sm:grid-cols-3 gap-4">
         <ActionCard
@@ -210,19 +254,6 @@ export default function LeadDetailPage() {
         onChange={load}
         canEdit={user?.role === 'admin' || !lead.sampleRequest?.requested || isSameDay(lead.sampleRequest?.date)}
       />
-
-      {/* Record follow-up — after saving, go back to the follow-ups screen */}
-      {!isClosed && (
-        <FollowUpForm leadId={id} onSaved={() => router.push('/follow-ups')} />
-      )}
-      {isClosed && (
-        <Card>
-          <p className="text-slate-500">
-            This lead is {lead.status === 'converted' ? 'converted 🎉' : 'closed'} — the
-            inquiry has ended.
-          </p>
-        </Card>
-      )}
 
       {/* History */}
       <div>
