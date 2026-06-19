@@ -6,6 +6,7 @@ const DistributorCall = require('../models/DistributorCall');
 const { startOfDay, endOfDay, isToday } = require('../utils/date');
 const { sendIntroMessage } = require('../services/whatsapp');
 const { logActivity } = require('../utils/activity');
+const { escapeRegex } = require('../middleware/security');
 
 const isAdmin = (user) => user.role === 'admin';
 
@@ -141,12 +142,13 @@ const listLeads = asyncHandler(async (req, res) => {
     if (to) filter.leadDate.$lte = endOfDay(new Date(to));
   }
   if (search) {
+    const rx = new RegExp(escapeRegex(search), 'i');
     filter.$or = [
-      { name: new RegExp(search, 'i') },
-      { companyName: new RegExp(search, 'i') },
-      { mobileNumber: new RegExp(search, 'i') },
-      { email: new RegExp(search, 'i') },
-      { product: new RegExp(search, 'i') },
+      { name: rx },
+      { companyName: rx },
+      { mobileNumber: rx },
+      { email: rx },
+      { product: rx },
     ];
   }
 

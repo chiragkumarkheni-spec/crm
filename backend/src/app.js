@@ -1,9 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
+const helmet = require('helmet');
 
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/error');
+const { mongoSanitize } = require('./middleware/security');
 
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
@@ -14,10 +16,25 @@ const distributorRoutes = require('./routes/distributor.routes');
 
 const app = express();
 
+// Don't advertise the server framework (one less hint for an attacker).
+app.disable('x-powered-by');
+
+// Secure HTTP response headers (clickjacking, MIME-sniffing, referrer, etc.).
+// This is a JSON API, not an HTML site, so the CSP/COEP page-protections add no
+// value here and can interfere with cross-origin API calls — keep those off.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+  })
+);
+
 // --- Core middleware ---
 const origins = (process.env.CLIENT_ORIGIN || 'http://localhost:3000')
   .split(',')
-  .map((o) => o.trim());
+  .map((o) => o.trim())
+  .filter(Boolean);
 
 app.use(
   cors({
@@ -26,6 +43,7 @@ app.use(
   })
 );
 app.use(express.json({ limit: '1mb' }));
+app.use(mongoSanitize); // strip $-operators / dotted keys from all user input
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }

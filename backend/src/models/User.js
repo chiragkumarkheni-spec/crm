@@ -23,6 +23,10 @@ const userSchema = new mongoose.Schema(
     // in. Admin can reset it (clear deviceId) when the rep moves to a new PC.
     deviceId: { type: String, default: null },
     deviceBoundAt: { type: Date },
+    // Brute-force protection: count consecutive wrong-password attempts and, after
+    // too many, lock the account for a short cool-off window. Cleared on success.
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date },
     // Soft delete: a "deleted" user is moved to the Recycle Bin (hidden from
     // the main list and unable to log in) but never removed from the database.
     deleted: { type: Boolean, default: false },

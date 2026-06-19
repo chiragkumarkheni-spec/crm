@@ -2,10 +2,15 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const { signToken } = require('../utils/token');
 
+// Brute-force lockout settings: after this many wrong passwords in a row, the
+// account is frozen for the cool-off window so a robot cannot keep guessing.
+const MAX_LOGIN_ATTEMPTS = 8;
+const LOCK_MINUTES = 15;
+
 // POST /api/auth/login
 const login = asyncHandler(async (req, res) => {
   const { email, password, deviceId } = req.body;
-  if (!email || !password) {
+  if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
     res.status(400);
     throw new Error('Email and password are required');
   }
@@ -18,10 +23,34 @@ const login = asyncHandler(async (req, res) => {
     throw new Error('Invalid credentials');
   }
 
+  // If the account is currently locked from too many wrong attempts, refuse early
+  // (without even checking the password) until the cool-off window passes.
+  if (user.lockUntil && user.lockUntil.getTime() > Date.now()) {
+    const mins = Math.ceil((user.lockUntil.getTime() - Date.now()) / 60000);
+    res.status(429);
+    throw new Error(
+      `Bahut baar galat password. Account ${mins} minute ke liye lock hai — thodi der baad try karo.`
+    );
+  }
+
   const ok = await user.comparePassword(password);
   if (!ok) {
+    // Wrong password — count it, and lock the account if the limit is crossed.
+    user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+    if (user.failedLoginAttempts >= MAX_LOGIN_ATTEMPTS) {
+      user.lockUntil = new Date(Date.now() + LOCK_MINUTES * 60000);
+      user.failedLoginAttempts = 0; // reset the counter; the lock now applies
+    }
+    await user.save();
     res.status(401);
     throw new Error('Invalid credentials');
+  }
+
+  // Correct password — clear any failed-attempt count / lock.
+  if (user.failedLoginAttempts || user.lockUntil) {
+    user.failedLoginAttempts = 0;
+    user.lockUntil = undefined;
+    await user.save();
   }
 
   // DEVICE LOCK — employees (reps) can log in from only ONE PC. The first login

@@ -18,6 +18,10 @@ const createUser = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('name, email and password are required');
   }
+  if (String(password).length < 6) {
+    res.status(400);
+    throw new Error('Password kam se kam 6 character ka hona chahiye');
+  }
   const exists = await User.findOne({ email: email.toLowerCase() });
   if (exists) {
     res.status(400);
@@ -55,7 +59,13 @@ const updateUser = asyncHandler(async (req, res) => {
   }
   if (role !== undefined) user.role = role === 'admin' ? 'admin' : 'employee';
   if (active !== undefined) user.active = !!active;
-  if (password) await user.setPassword(password);
+  if (password) {
+    if (String(password).length < 6) {
+      res.status(400);
+      throw new Error('Password kam se kam 6 character ka hona chahiye');
+    }
+    await user.setPassword(password);
+  }
   // Reset the device lock so the rep can bind a new PC on their next login.
   if (req.body.resetDevice) {
     user.deviceId = null;

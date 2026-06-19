@@ -4,6 +4,7 @@ const DistributorCall = require('../models/DistributorCall');
 const { logActivity } = require('../utils/activity');
 const { endOfDay } = require('../utils/date');
 const { sanitizeNote } = require('../utils/sanitize');
+const { escapeRegex } = require('../middleware/security');
 
 const isAdmin = (user) => user.role === 'admin';
 
@@ -54,11 +55,8 @@ const listDistributors = asyncHandler(async (req, res) => {
   if (!isAdmin(req.user)) filter.assignedTo = req.user._id;
   else if (employee) filter.assignedTo = employee;
   if (search) {
-    filter.$or = [
-      { name: new RegExp(search, 'i') },
-      { mobileNumber: new RegExp(search, 'i') },
-      { companyName: new RegExp(search, 'i') },
-    ];
+    const rx = new RegExp(escapeRegex(search), 'i');
+    filter.$or = [{ name: rx }, { mobileNumber: rx }, { companyName: rx }];
   }
 
   const [items, total] = await Promise.all([
