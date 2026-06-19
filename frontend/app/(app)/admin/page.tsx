@@ -12,6 +12,8 @@ export default function AdminPage() {
   const [tab, setTab] = useState<'active' | 'bin'>('active');
   const [users, setUsers] = useState<User[]>([]);
   const [showForm, setShowForm] = useState(false);
+  // The employee whose login id / password the admin is managing (opens a popup).
+  const [manageUser, setManageUser] = useState<User | null>(null);
 
   const load = useCallback(() => {
     const path = tab === 'bin' ? '/api/users?deleted=true' : '/api/users';
@@ -144,18 +146,23 @@ export default function AdminPage() {
                         ↩ Restore
                       </Button>
                     ) : (
-                      u._id !== user._id && (
-                        <>
-                          <Button variant="secondary" onClick={() => toggleActive(u)}>
-                            {u.active ? 'Disable' : 'Enable'}
-                          </Button>
-                          {u.role !== 'admin' && (
-                            <Button variant="danger" onClick={() => moveToBin(u)}>
-                              Delete
+                      <>
+                        <Button variant="secondary" onClick={() => setManageUser(u)}>
+                          🔑 Login / Password
+                        </Button>
+                        {u._id !== user._id && (
+                          <>
+                            <Button variant="secondary" onClick={() => toggleActive(u)}>
+                              {u.active ? 'Disable' : 'Enable'}
                             </Button>
-                          )}
-                        </>
-                      )
+                            {u.role !== 'admin' && (
+                              <Button variant="danger" onClick={() => moveToBin(u)}>
+                                Delete
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </>
                     )}
                   </div>
                 </td>
@@ -171,6 +178,102 @@ export default function AdminPage() {
           </tbody>
         </table>
       </Card>
+
+      {manageUser && (
+        <ManageUserModal
+          target={manageUser}
+          onClose={() => setManageUser(null)}
+          onSaved={() => {
+            setManageUser(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ManageUserModal({
+  target,
+  onClose,
+  onSaved,
+}: {
+  target: User;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(target.name || '');
+  const [email, setEmail] = useState(target.email || '');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [done, setDone] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setError('');
+    setDone('');
+    if (!name.trim() || !email.trim()) {
+      setError('Naam aur login id (email) zaroori hai.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const body: Record<string, string> = { name: name.trim(), email: email.trim() };
+      if (password.trim()) body.password = password.trim();
+      await api.patch(`/api/users/${target._id}`, body);
+      setDone('✅ Save ho gaya.');
+      setTimeout(onSaved, 600);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
+        <h2 className="mb-1 text-lg font-semibold">Login / Password — {target.name}</h2>
+        <p className="mb-4 text-xs text-slate-500">
+          Is employee ka login id (email) aur password admin yahan se badal sakta hai.
+        </p>
+        {error && (
+          <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
+        )}
+        {done && (
+          <div className="mb-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700">{done}</div>
+        )}
+        <div className="flex flex-col gap-4">
+          <Field label="Name">
+            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="Login id (email)">
+            <input
+              type="email"
+              className={inputClass}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </Field>
+          <Field label="New password (khali chhodo to nahi badlega)">
+            <input
+              type="text"
+              className={inputClass}
+              value={password}
+              placeholder="Naya password set karna ho to yahan likho"
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={onClose} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

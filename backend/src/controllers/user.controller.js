@@ -40,8 +40,19 @@ const updateUser = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error('User not found');
   }
-  const { name, role, active, password } = req.body;
+  const { name, email, role, active, password } = req.body;
   if (name !== undefined) user.name = name;
+  if (email !== undefined && email.trim()) {
+    const e = email.trim().toLowerCase();
+    if (e !== user.email) {
+      const exists = await User.findOne({ email: e, _id: { $ne: user._id } });
+      if (exists) {
+        res.status(400);
+        throw new Error('A user with this email (login id) already exists');
+      }
+      user.email = e;
+    }
+  }
   if (role !== undefined) user.role = role === 'admin' ? 'admin' : 'employee';
   if (active !== undefined) user.active = !!active;
   if (password) await user.setPassword(password);
