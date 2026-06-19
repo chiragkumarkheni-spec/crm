@@ -170,7 +170,12 @@ function CallRow({ call }: { call: RepCall }) {
           <span className="font-medium text-green-700">💰 {formatMoney(call.orderValue)}</span>
         )}
       </div>
-      {call.note && <p className="text-sm text-slate-600">{call.note}</p>}
+      {call.note && (
+        <div
+          className="text-sm text-slate-600"
+          dangerouslySetInnerHTML={{ __html: call.note }}
+        />
+      )}
     </Card>
   );
 

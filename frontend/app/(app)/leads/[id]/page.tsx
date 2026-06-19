@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import type { Lead, FollowUp, Outcome, User } from '@/lib/types';
 import { OUTCOME_LABELS } from '@/lib/types';
 import { Card, Button, Field, inputClass, StatusBadge } from '@/components/ui';
+import { RichNote, richText } from '@/components/RichNote';
 import { formatDate, formatDateTime, formatMoney, todayISO } from '@/lib/format';
 
 // True if the given timestamp is within the last 24 hours (a rep's correction window).
@@ -249,7 +250,10 @@ export default function LeadDetailPage() {
                       <span className="text-xs text-slate-400">{formatDateTime(f.date)}</span>
                     </div>
                   </div>
-                  <p className="text-sm text-slate-700">{f.development}</p>
+                  <div
+                    className="text-sm text-slate-700"
+                    dangerouslySetInnerHTML={{ __html: f.development }}
+                  />
                   <div className="flex flex-wrap gap-3 text-xs text-slate-500 mt-1">
                     {f.nextFollowUpDate && (
                       <span>Next: {formatDate(f.nextFollowUpDate)}</span>
@@ -332,7 +336,7 @@ function EditFollowUpModal({
 
   async function save() {
     setError('');
-    if (!development.trim()) {
+    if (!richText(development)) {
       setError('Note khali nahi ho sakta.');
       return;
     }
@@ -384,12 +388,7 @@ function EditFollowUpModal({
             </select>
           </Field>
           <Field label="Development / note">
-            <textarea
-              className={inputClass}
-              rows={3}
-              value={development}
-              onChange={(e) => setDevelopment(e.target.value)}
-            />
+            <RichNote value={development} onChange={setDevelopment} />
           </Field>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose} disabled={saving}>
@@ -634,6 +633,11 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
     e.preventDefault();
     setError('');
 
+    if (!richText(development)) {
+      setError('Development note likhna zaroori hai.');
+      return;
+    }
+
     // Same-day follow-up MUST have a time (so it pops up as "urgent" at that time).
     // Future-day follow-ups don't need a time.
     if (outcome !== 'converted' && isSameDay && !nextFollowUpTime) {
@@ -784,13 +788,10 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
             <strong>🔴 Call now</strong> me aa jaayegi.
           </p>
         )}
-        <Field label="Development (auto-filled from outcome — edit if you want)">
-          <textarea
-            className={inputClass}
-            rows={3}
-            required
+        <Field label="Development (lead se baat — highlight/font se important baat ubhaaro)">
+          <RichNote
             value={development}
-            onChange={(e) => setDevelopment(e.target.value)}
+            onChange={setDevelopment}
             placeholder="Outcome select karte hi yahan note aa jaayega…"
           />
         </Field>

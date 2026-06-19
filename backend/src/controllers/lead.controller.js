@@ -28,6 +28,21 @@ function within24h(date) {
   return (Date.now() - new Date(date).getTime()) / 3600000 <= CORRECTION_HOURS;
 }
 
+// Follow-up notes accept light rich text (highlight / font-size via inline
+// styles). Strip anything that could execute: script/style/iframe blocks, inline
+// event handlers, and javascript: URLs. CSS in a style="" attribute cannot run JS
+// in modern browsers, so it is kept (that is how highlight & font-size are saved).
+function sanitizeNote(html) {
+  if (html == null) return '';
+  return String(html)
+    .replace(/<\/?(script|style|iframe|object|embed|link|meta|form)\b[^>]*>/gi, '')
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, '')
+    .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '')
+    .trim();
+}
+
 // Can this user still edit this lead?
 function canEditLead(user, lead) {
   const hrs = hoursSince(lead.createdAt || lead.leadDate);
@@ -416,7 +431,8 @@ const addFollowUp = asyncHandler(async (req, res) => {
     throw new Error('Not your lead');
   }
 
-  const { outcome, development, nextFollowUpDate, orderValue } = req.body;
+  const { outcome, nextFollowUpDate, orderValue } = req.body;
+  const development = sanitizeNote(req.body.development);
   if (!outcome || !development) {
     res.status(400);
     throw new Error('outcome and development are required');
@@ -588,8 +604,9 @@ const editFollowUp = asyncHandler(async (req, res) => {
   const revertedConversion = wasConverted && outcome && outcome !== 'converted';
 
   if (outcome) followUp.outcome = outcome;
-  if (development !== undefined && development.trim()) {
-    followUp.development = development.trim();
+  if (development !== undefined) {
+    const clean = sanitizeNote(development);
+    if (clean) followUp.development = clean;
   }
   if (revertedConversion) followUp.orderValue = undefined; // no longer a sale
   await followUp.save();

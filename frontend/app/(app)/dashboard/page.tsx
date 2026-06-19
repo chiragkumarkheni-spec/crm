@@ -15,6 +15,13 @@ export default function DashboardPage() {
   const { data: dueLeads } = useApiData<Lead[]>('/api/leads/today-followups');
   const dueCount = dueLeads ? dueLeads.length : null;
 
+  // The two numbers that matter most, merged and highlighted on the first screen:
+  //  - TODAY's total calls = lead follow-up calls + distributor calls
+  //  - THIS MONTH's total sales = converted-lead orders + distributor orders
+  const dailyCalls = (summary?.totalCalls ?? 0) + (summary?.distributorCalls ?? 0);
+  const totalSales =
+    (summary?.monthlyOrderValue ?? 0) + (summary?.monthlyDistributorOrderValue ?? 0);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -29,6 +36,31 @@ export default function DashboardPage() {
         <Link href="/leads">
           <Button>+ Add / view leads</Button>
         </Link>
+      </div>
+
+      {/* ===== HIGHLIGHTS — the two most important numbers, merged ===== */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 p-5 text-white shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-medium text-white/90">
+            <IconPhone className="h-5 w-5" /> Aaj ke total calls
+          </div>
+          <p className="mt-1 text-4xl font-extrabold tracking-tight">{dailyCalls}</p>
+          <p className="mt-1 text-xs text-white/80">
+            {summary?.totalCalls ?? 0} lead calls + {summary?.distributorCalls ?? 0} distributor calls
+          </p>
+        </div>
+        <div className="rounded-2xl bg-gradient-to-br from-green-600 to-emerald-700 p-5 text-white shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-medium text-white/90">
+            <IconRupee className="h-5 w-5" /> Is mahine ki total sales
+          </div>
+          <p className="mt-1 text-4xl font-extrabold tracking-tight">
+            {summary ? formatMoney(totalSales) : '—'}
+          </p>
+          <p className="mt-1 text-xs text-white/80">
+            converted {formatMoney(summary?.monthlyOrderValue ?? 0)} + distributor{' '}
+            {formatMoney(summary?.monthlyDistributorOrderValue ?? 0)}
+          </p>
+        </div>
       </div>
 
       <Card className="flex items-center justify-between bg-slate-900 text-white">
@@ -52,8 +84,9 @@ export default function DashboardPage() {
           tone="blue"
         />
         <StatCard
-          label="Total calls"
+          label="Lead calls"
           value={summary?.totalCalls ?? '—'}
+          hint="today"
           icon={<IconPhone className="h-5 w-5" />}
           tone="brand"
         />
