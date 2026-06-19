@@ -111,6 +111,7 @@ export default function AdminPage() {
               <th className="px-4 py-3 font-medium">
                 {tab === 'bin' ? 'Deleted' : 'Status'}
               </th>
+              {tab !== 'bin' && <th className="px-4 py-3 font-medium">💻 Device lock</th>}
               <th className="px-4 py-3 font-medium">
                 {tab === 'bin' ? '' : 'Joined'}
               </th>
@@ -134,6 +135,33 @@ export default function AdminPage() {
                     <span className={u.active ? 'text-green-700' : 'text-rose-600'}>
                       {u.active ? 'Active' : 'Disabled'}
                     </span>
+                  </td>
+                )}
+                {tab !== 'bin' && (
+                  <td className="px-4 py-3">
+                    {u.role === 'admin' ? (
+                      <span className="text-xs text-slate-400">— (admin, kahi bhi)</span>
+                    ) : u.deviceId ? (
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                          🔒 PC locked
+                        </span>
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`${u.name} ka device lock reset karein? Agla login naye PC ko bind karega.`)) return;
+                            await api.patch(`/api/users/${u._id}`, { resetDevice: true });
+                            load();
+                          }}
+                          className="text-xs font-medium text-blue-600 hover:underline"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        ○ koi PC nahi
+                      </span>
+                    )}
                   </td>
                 )}
                 <td className="px-4 py-3 text-slate-600">
@@ -170,7 +198,7 @@ export default function AdminPage() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={tab === 'bin' ? 6 : 7} className="px-4 py-8 text-center text-slate-500">
                   {tab === 'bin' ? 'Recycle Bin is empty.' : 'No employees yet.'}
                 </td>
               </tr>
