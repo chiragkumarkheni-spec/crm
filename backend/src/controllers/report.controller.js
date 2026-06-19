@@ -298,4 +298,61 @@ const distributorCallList = asyncHandler(async (req, res) => {
   res.json({ range: { from, to }, items });
 });
 
-module.exports = { summary, byEmployee, distributorCallList };
+// ---------------------------------------------------------------------------
+// GET /api/reports/rep-calls?employee=<id>&limit=   (admin only)
+//   One rep's full CALL LOG — their lead follow-up calls AND distributor calls,
+//   merged into a single time-ordered list. Used by the side-by-side compare view.
+// ---------------------------------------------------------------------------
+const repCalls = asyncHandler(async (req, res) => {
+  const empId = req.query.employee;
+  if (!empId || !mongoose.Types.ObjectId.isValid(empId)) {
+    return res.json({ items: [] });
+  }
+  const oid = new mongoose.Types.ObjectId(empId);
+  const limit = Math.min(parseInt(req.query.limit, 10) || 100, 300);
+
+  const [fups, dcalls] = await Promise.all([
+    FollowUp.find({ employee: oid })
+      .populate('lead', 'name mobileNumber')
+      .sort({ date: -1 })
+      .limit(limit)
+      .lean(),
+    DistributorCall.find({ employee: oid })
+      .populate('distributor', 'name mobileNumber')
+      .sort({ date: -1 })
+      .limit(limit)
+      .lean(),
+  ]);
+
+  const items = [
+    ...fups.map((f) => ({
+      _id: String(f._id),
+      kind: 'lead',
+      date: f.date,
+      name: (f.lead && f.lead.name) || '—',
+      mobile: (f.lead && f.lead.mobileNumber) || '',
+      label: f.outcome,
+      note: f.development || '',
+      orderValue: f.orderValue || 0,
+      refId: f.lead && f.lead._id ? String(f.lead._id) : null,
+    })),
+    ...dcalls.map((c) => ({
+      _id: String(c._id),
+      kind: 'distributor',
+      date: c.date,
+      name: (c.distributor && c.distributor.name) || '—',
+      mobile: (c.distributor && c.distributor.mobileNumber) || '',
+      label: c.category,
+      note: c.note || '',
+      orderValue: c.orderValue || 0,
+      direction: c.direction,
+      refId: c.distributor && c.distributor._id ? String(c.distributor._id) : null,
+    })),
+  ]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, limit);
+
+  res.json({ items });
+});
+
+module.exports = { summary, byEmployee, distributorCallList, repCalls };
