@@ -272,9 +272,10 @@ function EditDistCallModal({
               </Field>
             )}
           </div>
-          <Field label="Note">
+          <div className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium text-slate-700">Note</span>
             <RichNote value={note} onChange={setNote} />
-          </Field>
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose} disabled={saving}>
               Cancel
@@ -386,13 +387,16 @@ function LogCallForm({ distributorId, onSaved }: { distributorId: string; onSave
             </Field>
           )}
         </div>
-        <Field label="Note — highlight/font se important baat ubhaaro">
+        <div className="flex flex-col gap-1.5 text-sm">
+          <span className="font-medium text-slate-700">
+            Note — highlight/font se important baat ubhaaro
+          </span>
           <RichNote
             value={note}
             onChange={setNote}
             placeholder="e.g. 500 ltr ka naya order; payment 15 din me."
           />
-        </Field>
+        </div>
 
         {/* Next distributor follow-up (separate from leads) */}
         <div className="rounded-lg border border-stone-200 bg-stone-50/60 p-3">

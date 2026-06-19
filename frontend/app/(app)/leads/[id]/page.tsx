@@ -418,9 +418,10 @@ function EditFollowUpModal({
               ))}
             </select>
           </Field>
-          <Field label="Development / note">
+          <div className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium text-slate-700">Development / note</span>
             <RichNote value={development} onChange={setDevelopment} />
-          </Field>
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={onClose} disabled={saving}>
               Cancel
@@ -819,13 +820,16 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
             <strong>🔴 Call now</strong> me aa jaayegi.
           </p>
         )}
-        <Field label="Development (lead se baat — highlight/font se important baat ubhaaro)">
+        <div className="flex flex-col gap-1.5 text-sm">
+          <span className="font-medium text-slate-700">
+            Development (lead se baat — highlight/font se important baat ubhaaro)
+          </span>
           <RichNote
             value={development}
             onChange={setDevelopment}
             placeholder="Outcome select karte hi yahan note aa jaayega…"
           />
-        </Field>
+        </div>
           <div>
             <Button type="submit" disabled={saving}>
               {saving ? 'Saving…' : 'Save follow-up'}
