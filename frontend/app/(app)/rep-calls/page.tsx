@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useApiData } from '@/lib/useApiData';
-import type { User } from '@/lib/types';
+import type { User, ReportSummary } from '@/lib/types';
 import { OUTCOME_LABELS, DISTRIBUTOR_CATEGORIES } from '@/lib/types';
 import { inputClass } from '@/components/ui';
 import { formatMoney } from '@/lib/format';
@@ -93,10 +93,15 @@ function RepColumn({
     `/api/reports/rep-calls?employee=${value || 'none'}`
   );
   const items = data?.items ?? [];
-  const orderTotal = useMemo(
-    () => items.reduce((sum, c) => sum + (c.orderValue || 0), 0),
-    [items]
+  // Orders shown here = the rep's RUNNING-MONTH order value (converted-lead orders
+  // + distributor orders), same number as their dashboard — not just the sum over
+  // the visible recent call log, which under-counted (e.g. showed ₹3k for a month
+  // that was actually ₹2.5L).
+  const { data: summary } = useApiData<ReportSummary>(
+    value ? `/api/reports/summary?employee=${value}` : null
   );
+  const monthOrders =
+    (summary?.monthlyOrderValue ?? 0) + (summary?.monthlyDistributorOrderValue ?? 0);
 
   return (
     <div className={`flex flex-col gap-3 rounded-2xl border-t-4 bg-white p-3 shadow-sm ${accent}`}>
@@ -115,9 +120,10 @@ function RepColumn({
         </select>
       </div>
       <div className="flex items-center justify-between px-1 text-xs text-slate-500">
-        <span>{items.length} calls</span>
+        <span>{items.length} calls (recent)</span>
         <span>
-          Orders: <strong className="text-green-700">{formatMoney(orderTotal)}</strong>
+          Orders (is mahine):{' '}
+          <strong className="text-green-700">{formatMoney(monthOrders)}</strong>
         </span>
       </div>
 
