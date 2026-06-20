@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import type { Lead, FollowUp, Outcome, User } from '@/lib/types';
 import { OUTCOME_LABELS } from '@/lib/types';
 import { Card, Button, Field, inputClass, StatusBadge } from '@/components/ui';
+import { CallQR } from '@/components/CallQR';
 import { RichNote, richText } from '@/components/RichNote';
 import { formatDate, formatDateTime, formatMoney, todayISO } from '@/lib/format';
 
@@ -137,6 +138,10 @@ export default function LeadDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Scan-to-call: CRM stays on the PC, call goes out from the iPhone with no
+          number typing — point the phone Camera at this QR. */}
+      <CallQR mobile={lead.mobileNumber} />
 
       {editing && canEdit && (
         <LeadEditForm
