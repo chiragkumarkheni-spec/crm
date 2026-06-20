@@ -19,6 +19,22 @@ const args = process.argv.slice(2);
 const DRY = args.includes('--dry'); // preview only, writes nothing to the database
 const SET_CATALOGUE = args.includes('--catalogue'); // mark catalogue sent on every imported lead
 const FORCE_TODAY = args.includes('--today'); // ignore the file's Lead Date, use today's date
+// --rep=<email>   assign EVERY imported lead to this one rep (ignore the file's Rep Email column)
+// --followup=YYYY-MM-DD  set the same next-follow-up date on every lead, so they all
+//                        surface on the follow-ups screen on that day (status stays "new").
+const REP_OVERRIDE = (args.find((a) => a.startsWith('--rep=')) || '').split('=')[1] || '';
+const FOLLOWUP_ARG = (args.find((a) => a.startsWith('--followup=')) || '').split('=')[1] || '';
+let FOLLOWUP_DATE = null;
+if (FOLLOWUP_ARG) {
+  const mm = FOLLOWUP_ARG.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!mm) {
+    console.error('--followup must be YYYY-MM-DD (e.g. --followup=2026-06-29)');
+    process.exit(1);
+  }
+  // Local (Asia/Kolkata) midday so it lands squarely inside that day's window
+  // regardless of TZ edges when the follow-up screen filters start..end of day.
+  FOLLOWUP_DATE = new Date(Number(mm[1]), Number(mm[2]) - 1, Number(mm[3]), 12, 0, 0);
+}
 const file = args.find((a) => !a.startsWith('--'));
 if (!file) {
   console.error('Usage: node scripts/import-leads.js <path-to-xlsx> [--dry]');
@@ -94,6 +110,21 @@ function parseDate(raw) {
   const byEmail = new Map(users.map((u) => [String(u.email).toLowerCase(), u]));
   const admin = users.find((u) => u.role === 'admin');
 
+  // --rep override: every lead goes to this one rep. Fail loudly if the email
+  // doesn't match a user — better to stop than silently import to the wrong owner.
+  let repOverrideUser = null;
+  if (REP_OVERRIDE) {
+    repOverrideUser = byEmail.get(REP_OVERRIDE.toLowerCase());
+    if (!repOverrideUser) {
+      console.error(`--rep "${REP_OVERRIDE}" did not match any user. Known emails:`);
+      users.forEach((u) => console.error(`   ${u.email} (${u.role})`));
+      await mongoose.disconnect();
+      process.exit(1);
+    }
+    console.log(`All leads -> ${repOverrideUser.name} <${repOverrideUser.email}>`);
+  }
+  if (FOLLOWUP_DATE) console.log(`Next follow-up date -> ${FOLLOWUP_DATE.toDateString()}`);
+
   const mobileWarnings = [];
   const repWarnings = [];
   const skipped = [];
@@ -117,11 +148,14 @@ function parseDate(raw) {
       mobileWarnings.push({ rowNum, name, original: m.original || '(blank)', stored: m.value });
     }
 
-    const repEmail = val(r, 'Rep Email *', 'Rep Email').toLowerCase();
-    let owner = byEmail.get(repEmail);
+    let owner = repOverrideUser;
     if (!owner) {
-      repWarnings.push({ rowNum, name, repEmail: repEmail || '(blank)' });
-      owner = admin; // fallback so the lead is never lost; admin can reassign later
+      const repEmail = val(r, 'Rep Email *', 'Rep Email').toLowerCase();
+      owner = byEmail.get(repEmail);
+      if (!owner) {
+        repWarnings.push({ rowNum, name, repEmail: repEmail || '(blank)' });
+        owner = admin; // fallback so the lead is never lost; admin can reassign later
+      }
     }
 
     const leadDate = FORCE_TODAY
@@ -146,6 +180,7 @@ function parseDate(raw) {
         assignedTo: owner._id,
         leadDate,
         status: 'new',
+        ...(FOLLOWUP_DATE ? { nextFollowUpDate: FOLLOWUP_DATE } : {}),
         ...(SET_CATALOGUE ? { catalogue: { sent: true, date: new Date() } } : {}),
       });
     }
