@@ -115,6 +115,10 @@ const leadSchema = new mongoose.Schema(
 
 leadSchema.index({ assignedTo: 1, nextFollowUpDate: 1 });
 leadSchema.index({ createdBy: 1, leadDate: 1 });
+// The Leads list is always "a rep's leads, newest first" — let the index do the
+// sort instead of an in-memory SORT stage. Second index covers the Strong tab.
+leadSchema.index({ assignedTo: 1, createdAt: -1 });
+leadSchema.index({ assignedTo: 1, strong: 1, createdAt: -1 });
 
 leadSchema.statics.STATUSES = LEAD_STATUSES;
 

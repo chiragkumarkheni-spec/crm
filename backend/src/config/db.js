@@ -36,7 +36,10 @@ async function connectDB() {
         // query hang the warm function forever.
         serverSelectionTimeoutMS: 8000,
         maxPoolSize: 10,
-        minPoolSize: 0,
+        // Keep ONE socket warm so a returning request on an already-warm function
+        // skips the TCP+TLS+auth handshake (that handshake is the slow part once
+        // the function and DB are in the same region).
+        minPoolSize: 1,
         socketTimeoutMS: 20000,
       })
       .then((m) => m);

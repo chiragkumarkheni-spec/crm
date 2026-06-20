@@ -37,12 +37,17 @@ export default function LeadsPage() {
   // Admin can land here filtered to one rep (from the Reports page).
   const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [employeeName, setEmployeeName] = useState('');
+  // Don't fetch until the URL (?strong / ?employee) is read, otherwise we fire a
+  // throwaway "active leads" request first and the correct one second — two round
+  // trips on every Strong-leads click. Gate the fetch so exactly ONE goes out.
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search);
     setEmployeeId(sp.get('employee'));
     setEmployeeName(sp.get('name') || '');
     if (sp.get('strong') === 'true') setTab('strong');
+    setReady(true);
   }, []);
 
   function clearRepFilter() {
@@ -78,7 +83,7 @@ export default function LeadsPage() {
   params.set('page', String(page));
   params.set('limit', String(PER_PAGE));
   const { data, refetch: load } = useApiData<LeadsResponse>(
-    `/api/leads?${params.toString()}`
+    ready ? `/api/leads?${params.toString()}` : null
   );
 
   async function del(lead: Lead) {
