@@ -40,7 +40,10 @@ export default function DashboardPage() {
 
       {/* ===== HIGHLIGHTS — the most important numbers ===== */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-2xl bg-gradient-to-br from-brand-500 to-brand-600 p-5 text-white shadow-sm">
+        <div
+          className="rounded-2xl p-5 text-white shadow-sm"
+          style={{ background: 'linear-gradient(135deg, #d97757, #c25c3c)' }}
+        >
           <div className="flex items-center gap-2 text-sm font-medium text-white/90">
             <IconPhone className="h-5 w-5" /> Aaj ke total calls
           </div>
@@ -49,7 +52,10 @@ export default function DashboardPage() {
             {summary?.totalCalls ?? 0} lead calls + {summary?.distributorCalls ?? 0} distributor calls
           </p>
         </div>
-        <div className="rounded-2xl bg-gradient-to-br from-green-600 to-emerald-700 p-5 text-white shadow-sm">
+        <div
+          className="rounded-2xl p-5 text-white shadow-sm"
+          style={{ background: 'linear-gradient(135deg, #16a34a, #047857)' }}
+        >
           <div className="flex items-center gap-2 text-sm font-medium text-white/90">
             <IconRupee className="h-5 w-5" /> Is mahine ki total sales
           </div>
@@ -63,7 +69,10 @@ export default function DashboardPage() {
         </div>
         {/* STRONG leads — crucial business signal */}
         <Link href="/leads?strong=true" className="block">
-          <div className="rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 p-5 text-white shadow-sm transition-transform hover:scale-[1.01]">
+          <div
+            className="rounded-2xl p-5 text-white shadow-sm transition-transform hover:scale-[1.01]"
+            style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b)' }}
+          >
             <div className="flex items-center gap-2 text-sm font-medium text-white/90">
               ⭐ Strong leads
             </div>
@@ -77,17 +86,23 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      <Card className="flex items-center justify-between bg-slate-900 text-white">
+      <div
+        className="flex items-center justify-between rounded-2xl p-5 text-white shadow-sm"
+        style={{ backgroundColor: '#0f172a' }}
+      >
         <div>
-          <p className="text-sm text-slate-300">Follow-ups due today</p>
+          <p className="text-sm" style={{ color: '#cbd5e1' }}>Follow-ups due today</p>
           <p className="text-3xl font-bold">{dueCount ?? '—'}</p>
         </div>
         <Link href="/follow-ups">
-          <span className="rounded-lg bg-white/10 px-4 py-2 text-sm font-medium hover:bg-white/20">
+          <span
+            className="rounded-lg px-4 py-2 text-sm font-medium"
+            style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
+          >
             Go to follow-ups →
           </span>
         </Link>
-      </Card>
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
