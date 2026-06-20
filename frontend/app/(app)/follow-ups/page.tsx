@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useApiData } from '@/lib/useApiData';
 import type { Lead } from '@/lib/types';
 import { Card, StatusBadge, inputClass } from '@/components/ui';
+import { QuickFollowUp } from '@/components/QuickFollowUp';
 import { todayISO } from '@/lib/format';
 
 function fmtTime(d: string) {
@@ -44,11 +45,17 @@ export default function FollowUpsPage() {
       : `/api/leads/today-followups?date=${viewDate}`
   );
   // New leads still to be called (the working backlog) — only relevant for today.
-  const { data: newData } = useApiData<{ items: Lead[]; total: number }>(
+  const { data: newData, refetch: refetchNew } = useApiData<{ items: Lead[]; total: number }>(
     '/api/leads?status=new&limit=50'
   );
   const newLeads = newData?.items ?? [];
   const newCount = newData?.total ?? 0;
+
+  // After a one-tap quick-log, refresh both lists so the lead moves out of "due".
+  const afterQuickLog = () => {
+    refetch();
+    refetchNew();
+  };
 
   // Re-check the clock every 15s (flip to "Call now" on time) and re-fetch every
   // 30s (pick up newly-scheduled follow-ups) without a manual refresh.
@@ -174,49 +181,53 @@ export default function FollowUpsPage() {
               dueNow.map((lead) => {
                 const late = daysLate(lead.nextFollowUpDate);
                 return (
-                  <Link key={lead._id} href={`/leads/${lead._id}`}>
-                    <Card
-                      className={`border-l-4 transition-colors ${
-                        late > 0
-                          ? 'border-l-amber-500 bg-amber-50/60 hover:bg-amber-50'
-                          : 'border-l-rose-500 bg-rose-50/50 hover:bg-rose-50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="font-medium">
-                            {lead.name || 'Unnamed'}{' '}
-                            <span className="text-slate-400">·</span>{' '}
-                            <span className="text-slate-600">{lead.mobileNumber}</span>
-                          </p>
-                          <p className="text-sm text-slate-500">
-                            {lead.state || '—'} · {lead.followUpCount} follow-ups ·{' '}
-                            {late > 0 ? (
-                              <span className="font-semibold text-amber-700">
-                                {late} din late (was {fmtDate(lead.nextFollowUpDate as string)})
-                              </span>
-                            ) : (
-                              <span className="font-medium text-rose-600">
-                                due {fmtTime(lead.nextFollowUpDate as string)}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5">
+                  <Card
+                    key={lead._id}
+                    className={`border-l-4 ${
+                      late > 0
+                        ? 'border-l-amber-500 bg-amber-50/60'
+                        : 'border-l-rose-500 bg-rose-50/50'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <Link href={`/leads/${lead._id}`} className="min-w-0 flex-1 hover:underline">
+                        <p className="font-medium">
+                          {lead.name || 'Unnamed'}{' '}
+                          <span className="text-slate-400">·</span>{' '}
+                          <span className="text-slate-600">{lead.mobileNumber}</span>
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          {lead.state || '—'} · {lead.followUpCount} follow-ups ·{' '}
                           {late > 0 ? (
-                            <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-bold text-white">
-                              ⏰ LATE FOLLOWUP · {late} din
+                            <span className="font-semibold text-amber-700">
+                              {late} din late (was {fmtDate(lead.nextFollowUpDate as string)})
                             </span>
                           ) : (
-                            <span className="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs font-bold text-white">
-                              CALL NOW
+                            <span className="font-medium text-rose-600">
+                              due {fmtTime(lead.nextFollowUpDate as string)}
                             </span>
                           )}
-                          <StatusBadge status={lead.status} />
-                        </div>
+                        </p>
+                      </Link>
+                      <div className="flex flex-col items-end gap-1.5">
+                        {late > 0 ? (
+                          <span className="rounded-full bg-amber-500 px-2.5 py-0.5 text-xs font-bold text-white">
+                            ⏰ LATE FOLLOWUP · {late} din
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-rose-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                            CALL NOW
+                          </span>
+                        )}
+                        <StatusBadge status={lead.status} />
                       </div>
-                    </Card>
-                  </Link>
+                    </div>
+                    <QuickFollowUp
+                      leadId={lead._id}
+                      mobile={lead.mobileNumber}
+                      onDone={afterQuickLog}
+                    />
+                  </Card>
                 );
               })
             )}
@@ -229,24 +240,27 @@ export default function FollowUpsPage() {
                 ⏰ Scheduled later today ({later.length})
               </h2>
               {later.map((lead) => (
-                <Link key={lead._id} href={`/leads/${lead._id}`}>
-                  <Card className="transition-colors hover:border-slate-400">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="font-medium">
-                          {lead.name || 'Unnamed'}{' '}
-                          <span className="text-slate-400">·</span>{' '}
-                          <span className="text-slate-600">{lead.mobileNumber}</span>
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          {lead.state || '—'} · call at{' '}
-                          <strong>{fmtTime(lead.nextFollowUpDate as string)}</strong>
-                        </p>
-                      </div>
-                      <StatusBadge status={lead.status} />
-                    </div>
-                  </Card>
-                </Link>
+                <Card key={lead._id}>
+                  <div className="flex items-start justify-between gap-4">
+                    <Link href={`/leads/${lead._id}`} className="min-w-0 flex-1 hover:underline">
+                      <p className="font-medium">
+                        {lead.name || 'Unnamed'}{' '}
+                        <span className="text-slate-400">·</span>{' '}
+                        <span className="text-slate-600">{lead.mobileNumber}</span>
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {lead.state || '—'} · call at{' '}
+                        <strong>{fmtTime(lead.nextFollowUpDate as string)}</strong>
+                      </p>
+                    </Link>
+                    <StatusBadge status={lead.status} />
+                  </div>
+                  <QuickFollowUp
+                    leadId={lead._id}
+                    mobile={lead.mobileNumber}
+                    onDone={afterQuickLog}
+                  />
+                </Card>
               ))}
             </div>
           )}
@@ -258,24 +272,27 @@ export default function FollowUpsPage() {
                 🆕 New leads to call ({newCount})
               </h2>
               {newLeads.map((lead) => (
-                <Link key={lead._id} href={`/leads/${lead._id}`}>
-                  <Card className="transition-colors hover:border-slate-400">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="font-medium">
-                          {lead.name || 'Unnamed'}{' '}
-                          <span className="text-slate-400">·</span>{' '}
-                          <span className="text-slate-600">{lead.mobileNumber}</span>
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          {lead.state || '—'}
-                          {lead.city ? ` · ${lead.city}` : ''} · first call pending
-                        </p>
-                      </div>
-                      <StatusBadge status={lead.status} />
-                    </div>
-                  </Card>
-                </Link>
+                <Card key={lead._id}>
+                  <div className="flex items-start justify-between gap-4">
+                    <Link href={`/leads/${lead._id}`} className="min-w-0 flex-1 hover:underline">
+                      <p className="font-medium">
+                        {lead.name || 'Unnamed'}{' '}
+                        <span className="text-slate-400">·</span>{' '}
+                        <span className="text-slate-600">{lead.mobileNumber}</span>
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {lead.state || '—'}
+                        {lead.city ? ` · ${lead.city}` : ''} · first call pending
+                      </p>
+                    </Link>
+                    <StatusBadge status={lead.status} />
+                  </div>
+                  <QuickFollowUp
+                    leadId={lead._id}
+                    mobile={lead.mobileNumber}
+                    onDone={afterQuickLog}
+                  />
+                </Card>
               ))}
               {newCount > newLeads.length && (
                 <Link
