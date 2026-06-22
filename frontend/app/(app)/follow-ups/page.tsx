@@ -46,7 +46,7 @@ export default function FollowUpsPage() {
   );
   // New leads still to be called (the working backlog) — only relevant for today.
   const { data: newData, refetch: refetchNew } = useApiData<{ items: Lead[]; total: number }>(
-    '/api/leads?status=new&limit=50'
+    '/api/leads?status=new&unscheduled=true&limit=50'
   );
   const newLeads = newData?.items ?? [];
   const newCount = newData?.total ?? 0;

@@ -134,6 +134,13 @@ const listLeads = asyncHandler(async (req, res) => {
   const wantDeleted = isAdmin(req.user) && req.query.deleted === 'true';
   filter.deleted = wantDeleted ? true : { $ne: true };
   if (req.query.strong === 'true') filter.strong = true; // Strong-leads filter
+  // "New leads to call" backlog: exclude leads already scheduled for a FUTURE
+  // follow-up (e.g. imported leads given a 29/30-June callback). Those surface on
+  // their scheduled day, not in today's call-now backlog. `$not: {$gt}` also keeps
+  // leads that have no follow-up date at all.
+  if (req.query.unscheduled === 'true') {
+    filter.nextFollowUpDate = { $not: { $gt: endOfDay() } };
+  }
   if (status) filter.status = status;
   if (state) filter.state = state;
   if (from || to) {
