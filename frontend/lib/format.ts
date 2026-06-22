@@ -17,6 +17,7 @@ export function formatDateTime(d?: string | Date | null): string {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false, // 24-hour clock (13:00, 16:00) — no AM/PM
   });
 }
 

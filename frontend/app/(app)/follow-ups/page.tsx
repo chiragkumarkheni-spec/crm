@@ -10,7 +10,7 @@ import { RepFilter } from '@/components/RepFilter';
 import { todayISO } from '@/lib/format';
 
 function fmtTime(d: string) {
-  return new Date(d).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString([], { day: '2-digit', month: 'short' });
