@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
+const LoginEvent = require('../models/LoginEvent');
 const { signToken } = require('../utils/token');
 const { passwordError } = require('../utils/password');
 
@@ -7,6 +8,24 @@ const { passwordError } = require('../utils/password');
 // account is frozen for the cool-off window so a robot cannot keep guessing.
 const MAX_LOGIN_ATTEMPTS = 8;
 const LOCK_MINUTES = 15;
+
+// Record one login attempt (success or failure) for the security log. Awaited so
+// the entry is persisted before we respond, but wrapped so it can NEVER break login.
+async function recordLogin(req, { email, user, success, reason }) {
+  try {
+    await LoginEvent.create({
+      email: (email || '').toLowerCase(),
+      user: user ? user._id : undefined,
+      userName: user ? user.name : undefined,
+      success,
+      reason,
+      ip: req.ip,
+      userAgent: String(req.headers['user-agent'] || '').slice(0, 300),
+    });
+  } catch {
+    /* logging must never block a login */
+  }
+}
 
 // POST /api/auth/login
 const login = asyncHandler(async (req, res) => {
@@ -20,6 +39,7 @@ const login = asyncHandler(async (req, res) => {
     '+passwordHash'
   );
   if (!user || !user.active) {
+    await recordLogin(req, { email, success: false, reason: 'unknown_or_inactive' });
     res.status(401);
     throw new Error('Invalid credentials');
   }
@@ -27,6 +47,7 @@ const login = asyncHandler(async (req, res) => {
   // If the account is currently locked from too many wrong attempts, refuse early
   // (without even checking the password) until the cool-off window passes.
   if (user.lockUntil && user.lockUntil.getTime() > Date.now()) {
+    await recordLogin(req, { email, user, success: false, reason: 'locked' });
     const mins = Math.ceil((user.lockUntil.getTime() - Date.now()) / 60000);
     res.status(429);
     throw new Error(
@@ -43,6 +64,7 @@ const login = asyncHandler(async (req, res) => {
       user.failedLoginAttempts = 0; // reset the counter; the lock now applies
     }
     await user.save();
+    await recordLogin(req, { email, user, success: false, reason: 'bad_password' });
     res.status(401);
     throw new Error('Invalid credentials');
   }
@@ -59,6 +81,7 @@ const login = asyncHandler(async (req, res) => {
   // exempt so the owner can log in from anywhere. Admin can reset the bound PC.
   if (user.role === 'employee') {
     if (!deviceId) {
+      await recordLogin(req, { email, user, success: false, reason: 'no_device' });
       res.status(400);
       throw new Error('Device pehchana nahi gaya. App dobara kholkar try karo.');
     }
@@ -67,6 +90,7 @@ const login = asyncHandler(async (req, res) => {
       user.deviceBoundAt = new Date();
       await user.save();
     } else if (user.deviceId !== deviceId) {
+      await recordLogin(req, { email, user, success: false, reason: 'wrong_device' });
       res.status(403);
       throw new Error(
         'Aap sirf apne office PC se login kar sakte ho. Naye PC ke liye admin se device reset karwao.'
@@ -74,6 +98,7 @@ const login = asyncHandler(async (req, res) => {
     }
   }
 
+  await recordLogin(req, { email, user, success: true, reason: 'ok' });
   res.json({ token: signToken(user), user });
 });
 
@@ -118,4 +143,11 @@ const changePassword = asyncHandler(async (req, res) => {
   res.json({ success: true });
 });
 
-module.exports = { login, me, changePassword };
+// GET /api/auth/login-events  (admin) — recent login attempts for the security log.
+const getLoginEvents = asyncHandler(async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+  const items = await LoginEvent.find({}).sort({ createdAt: -1 }).limit(limit).lean();
+  res.json({ items });
+});
+
+module.exports = { login, me, changePassword, getLoginEvents };

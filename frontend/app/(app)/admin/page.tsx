@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import type { User } from '@/lib/types';
 import { Card, Button, Field, inputClass } from '@/components/ui';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatDateTime } from '@/lib/format';
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -207,6 +207,8 @@ export default function AdminPage() {
         </table>
       </Card>
 
+      {tab === 'active' && <RecentLogins />}
+
       {manageUser && (
         <ManageUserModal
           target={manageUser}
@@ -218,6 +220,87 @@ export default function AdminPage() {
         />
       )}
     </div>
+  );
+}
+
+// --- Security: recent login attempts (success + failures) ---
+type LoginEvent = {
+  _id: string;
+  email: string;
+  userName?: string;
+  success: boolean;
+  reason: string;
+  ip?: string;
+  createdAt: string;
+};
+
+const LOGIN_FAIL_LABEL: Record<string, string> = {
+  bad_password: '❌ Galat password',
+  locked: '🔒 Account locked',
+  wrong_device: '🖥 Galat device',
+  no_device: '❓ Device missing',
+  unknown_or_inactive: '❌ Unknown / inactive user',
+};
+
+function RecentLogins() {
+  const [items, setItems] = useState<LoginEvent[]>([]);
+  useEffect(() => {
+    api
+      .get<{ items: LoginEvent[] }>('/api/auth/login-events?limit=50')
+      .then((d) => setItems(d.items))
+      .catch(() => {});
+  }, []);
+
+  return (
+    <Card className="overflow-x-auto p-0">
+      <div className="border-b border-stone-100 px-4 py-3">
+        <h2 className="font-semibold">🔐 Recent logins (security)</h2>
+        <p className="text-xs text-slate-400">
+          Last 50 login attempts — success aur fail dono. Bahut saare fail (laal) ek hi
+          user/IP pe dikhe to kisi ne password guess karne ki koshish ki ho sakti hai.
+        </p>
+      </div>
+      <table className="w-full text-sm">
+        <thead className="bg-stone-50 text-left text-slate-500">
+          <tr>
+            <th className="px-4 py-2 font-medium">Time</th>
+            <th className="px-3 py-2 font-medium">User / Email</th>
+            <th className="px-3 py-2 font-medium">Result</th>
+            <th className="px-3 py-2 font-medium">IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((e) => (
+            <tr
+              key={e._id}
+              className={`border-t border-stone-100 ${e.success ? '' : 'bg-rose-50/40'}`}
+            >
+              <td className="whitespace-nowrap px-4 py-2 text-slate-500">
+                {formatDateTime(e.createdAt)}
+              </td>
+              <td className="px-3 py-2">{e.userName || e.email || '—'}</td>
+              <td className="px-3 py-2 font-medium">
+                {e.success ? (
+                  <span className="text-green-700">✅ Success</span>
+                ) : (
+                  <span className="text-rose-600">
+                    {LOGIN_FAIL_LABEL[e.reason] || '❌ Fail'}
+                  </span>
+                )}
+              </td>
+              <td className="px-3 py-2 text-slate-400">{e.ip || '—'}</td>
+            </tr>
+          ))}
+          {items.length === 0 && (
+            <tr>
+              <td colSpan={4} className="px-4 py-6 text-center text-slate-400">
+                Abhi koi login record nahi.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </Card>
   );
 }
 
