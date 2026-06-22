@@ -1,0 +1,37 @@
+name: Daily DB backup
+
+# Atlas free (M0) has no automated backups, so dump the whole database to JSON
+# every night and keep it as a downloadable artifact (90 days). Also runnable
+# on-demand from the Actions tab ("Run workflow").
+on:
+  schedule:
+    - cron: "30 19 * * *" # 19:30 UTC = 01:00 IST daily
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Dump database
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        run: npm run backup
+      - name: Upload backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backend/backups/
+          retention-days: 90
