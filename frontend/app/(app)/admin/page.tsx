@@ -242,12 +242,21 @@ const LOGIN_FAIL_LABEL: Record<string, string> = {
   unknown_or_inactive: '❌ Unknown / inactive user',
 };
 
+type LoginSummary = {
+  failedLast24h: number;
+  suspicious: { type: 'email' | 'ip'; value: string; count: number }[];
+};
+
 function RecentLogins() {
   const [items, setItems] = useState<LoginEvent[]>([]);
+  const [summary, setSummary] = useState<LoginSummary | null>(null);
   useEffect(() => {
     api
-      .get<{ items: LoginEvent[] }>('/api/auth/login-events?limit=50')
-      .then((d) => setItems(d.items))
+      .get<{ items: LoginEvent[]; summary: LoginSummary }>('/api/auth/login-events?limit=50')
+      .then((d) => {
+        setItems(d.items);
+        setSummary(d.summary);
+      })
       .catch(() => {});
   }, []);
 
@@ -260,6 +269,31 @@ function RecentLogins() {
           user/IP pe dikhe to kisi ne password guess karne ki koshish ki ho sakti hai.
         </p>
       </div>
+
+      {/* Auto suspicious-activity alert (24h) */}
+      {summary && summary.suspicious.length > 0 && (
+        <div className="border-b border-rose-200 bg-rose-50 px-4 py-3">
+          <p className="text-sm font-bold text-rose-700">
+            ⚠ Suspicious activity — pichhle 24 ghante me bahut saare failed logins!
+          </p>
+          <ul className="mt-1 list-disc pl-5 text-xs text-rose-700">
+            {summary.suspicious.map((s) => (
+              <li key={`${s.type}-${s.value}`}>
+                {s.type === 'email' ? 'User' : 'IP'} <b>{s.value}</b> — {s.count} baar fail
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[11px] text-rose-600">
+            Agar ye aapke reps nahi hain to password change karwao / us user ko check karo.
+          </p>
+        </div>
+      )}
+      {summary && summary.suspicious.length === 0 && (
+        <div className="border-b border-stone-100 px-4 py-2 text-xs text-slate-400">
+          ✅ Pichhle 24 ghante me koi suspicious pattern nahi · {summary.failedLast24h} total
+          failed attempts.
+        </div>
+      )}
       <table className="w-full text-sm">
         <thead className="bg-stone-50 text-left text-slate-500">
           <tr>

@@ -160,11 +160,36 @@ const changePassword = asyncHandler(async (req, res) => {
   res.json({ success: true });
 });
 
-// GET /api/auth/login-events  (admin) — recent login attempts for the security log.
+// GET /api/auth/login-events  (admin) — recent login attempts + a 24h suspicious-
+// activity summary (which user/IP is failing repeatedly = likely an attack).
 const getLoginEvents = asyncHandler(async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
-  const items = await LoginEvent.find({}).sort({ createdAt: -1 }).limit(limit).lean();
-  res.json({ items });
+  const SUSPICIOUS_THRESHOLD = 5; // failures in 24h before we flag it
+
+  const since = new Date(Date.now() - 24 * 3600 * 1000);
+  const [items, fails] = await Promise.all([
+    LoginEvent.find({}).sort({ createdAt: -1 }).limit(limit).lean(),
+    LoginEvent.find({ success: false, createdAt: { $gte: since } })
+      .select('email ip')
+      .lean(),
+  ]);
+
+  const byEmail = {};
+  const byIp = {};
+  for (const f of fails) {
+    if (f.email) byEmail[f.email] = (byEmail[f.email] || 0) + 1;
+    if (f.ip) byIp[f.ip] = (byIp[f.ip] || 0) + 1;
+  }
+  const suspicious = [
+    ...Object.entries(byEmail)
+      .filter(([, c]) => c >= SUSPICIOUS_THRESHOLD)
+      .map(([value, count]) => ({ type: 'email', value, count })),
+    ...Object.entries(byIp)
+      .filter(([, c]) => c >= SUSPICIOUS_THRESHOLD)
+      .map(([value, count]) => ({ type: 'ip', value, count })),
+  ].sort((a, b) => b.count - a.count);
+
+  res.json({ items, summary: { failedLast24h: fails.length, suspicious } });
 });
 
 // --- Optional two-factor (TOTP / authenticator app), self-service ---
