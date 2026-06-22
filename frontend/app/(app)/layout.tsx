@@ -54,18 +54,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: dueDists, refetch: refetchDist } = useApiData<Distributor[]>(
     '/api/distributors/today-followups'
   );
+  // Admin-only: a global security alert if logins are failing suspiciously, so it
+  // is seen on EVERY page (not only when the Admin screen is opened). limit=1 keeps
+  // the payload tiny — we only use the server-computed summary.
+  const { data: loginSec, refetch: refetchLogin } = useApiData<{
+    summary: { suspicious: { type: string; value: string; count: number }[] };
+  }>(user?.role === 'admin' ? '/api/auth/login-events?limit=1' : null);
+  const suspiciousCount = loginSec?.summary?.suspicious?.length ?? 0;
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
     const tick = setInterval(() => setNowTs(Date.now()), 15000);
     const poll = setInterval(() => {
       refetch();
       refetchDist();
+      refetchLogin();
     }, 30000);
     return () => {
       clearInterval(tick);
       clearInterval(poll);
     };
-  }, [refetch, refetchDist]);
+  }, [refetch, refetchDist, refetchLogin]);
   const dueNowLeads = (dueLeads ?? []).filter(
     (l) => !l.nextFollowUpDate || new Date(l.nextFollowUpDate).getTime() <= nowTs
   );
@@ -182,6 +190,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* ---- Main column ---- */}
       <div className="flex flex-1 flex-col min-w-0">
+        {/* Admin security alert — shows on EVERY page when logins are failing
+            suspiciously, so a password-guessing attempt can't go unnoticed. */}
+        {user.role === 'admin' && suspiciousCount > 0 && pathname !== '/admin' && (
+          <Link
+            href="/admin"
+            className="flex items-center justify-center gap-2 bg-rose-700 px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-rose-800"
+          >
+            🛡 Suspicious login activity — {suspiciousCount} user/IP pe bahut saare failed
+            logins. <span className="underline underline-offset-2">Dekho →</span>
+          </Link>
+        )}
+
         {/* Global "Call now" reminder — shows on every page when a follow-up is due */}
         {dueCount > 0 && pathname !== '/follow-ups' && (
           <Link
