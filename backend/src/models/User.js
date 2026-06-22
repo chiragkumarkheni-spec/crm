@@ -27,6 +27,10 @@ const userSchema = new mongoose.Schema(
     // too many, lock the account for a short cool-off window. Cleared on success.
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date },
+    // Optional two-factor auth (TOTP / authenticator app). The secret is hidden by
+    // default; `twoFactorEnabled` flips on only after the user confirms a code.
+    twoFactorSecret: { type: String, select: false },
+    twoFactorEnabled: { type: Boolean, default: false },
     // Soft delete: a "deleted" user is moved to the Recycle Bin (hidden from
     // the main list and unable to log in) but never removed from the database.
     deleted: { type: Boolean, default: false },
@@ -49,6 +53,7 @@ userSchema.methods.comparePassword = function comparePassword(plain) {
 userSchema.methods.toJSON = function toJSON() {
   const obj = this.toObject();
   delete obj.passwordHash;
+  delete obj.twoFactorSecret;
   return obj;
 };
 

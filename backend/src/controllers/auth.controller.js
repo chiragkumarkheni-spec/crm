@@ -3,6 +3,7 @@ const User = require('../models/User');
 const LoginEvent = require('../models/LoginEvent');
 const { signToken } = require('../utils/token');
 const { passwordError } = require('../utils/password');
+const { generateSecret, otpauthURL, verifyToken } = require('../utils/twofactor');
 
 // Brute-force lockout settings: after this many wrong passwords in a row, the
 // account is frozen for the cool-off window so a robot cannot keep guessing.
@@ -36,7 +37,7 @@ const login = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ email: email.toLowerCase() }).select(
-    '+passwordHash'
+    '+passwordHash +twoFactorSecret'
   );
   if (!user || !user.active) {
     await recordLogin(req, { email, success: false, reason: 'unknown_or_inactive' });
@@ -74,6 +75,22 @@ const login = asyncHandler(async (req, res) => {
     user.failedLoginAttempts = 0;
     user.lockUntil = undefined;
     await user.save();
+  }
+
+  // TWO-FACTOR (optional, per user). If on, a valid authenticator-app code is
+  // required before we issue a token or bind a device. The frontend shows a code
+  // box when it sees { twoFactorRequired: true } and re-submits with `code`.
+  if (user.twoFactorEnabled) {
+    const code = req.body.code;
+    if (!code || !verifyToken(user.twoFactorSecret, code)) {
+      await recordLogin(req, {
+        email,
+        user,
+        success: false,
+        reason: code ? '2fa_bad' : '2fa_required',
+      });
+      return res.json({ twoFactorRequired: true, invalidCode: !!code });
+    }
   }
 
   // DEVICE LOCK — employees (reps) can log in from only ONE PC. The first login
@@ -150,4 +167,57 @@ const getLoginEvents = asyncHandler(async (req, res) => {
   res.json({ items });
 });
 
-module.exports = { login, me, changePassword, getLoginEvents };
+// --- Optional two-factor (TOTP / authenticator app), self-service ---
+
+// POST /api/auth/2fa/setup — make a fresh secret and return its QR (otpauth) URI.
+// Not enabled yet: the user must confirm a code via /enable.
+const twoFactorSetup = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('+twoFactorSecret');
+  const secret = generateSecret();
+  user.twoFactorSecret = secret;
+  user.twoFactorEnabled = false;
+  await user.save();
+  res.json({ secret, otpauthUrl: otpauthURL(user.email, secret) });
+});
+
+// POST /api/auth/2fa/enable { code } — verify the first code, then switch 2FA on.
+const twoFactorEnable = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('+twoFactorSecret');
+  if (!user.twoFactorSecret) {
+    res.status(400);
+    throw new Error('Pehle setup karo, phir code daalo');
+  }
+  if (!verifyToken(user.twoFactorSecret, req.body.code)) {
+    res.status(400);
+    throw new Error('Code galat hai — app me jo 6 digit dikh raha hai wahi daalo');
+  }
+  user.twoFactorEnabled = true;
+  await user.save();
+  res.json({ success: true });
+});
+
+// POST /api/auth/2fa/disable { code } — turn 2FA off (needs a valid current code).
+const twoFactorDisable = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id).select('+twoFactorSecret');
+  if (!user.twoFactorEnabled) {
+    return res.json({ success: true });
+  }
+  if (!verifyToken(user.twoFactorSecret, req.body.code)) {
+    res.status(400);
+    throw new Error('Code galat hai');
+  }
+  user.twoFactorEnabled = false;
+  user.twoFactorSecret = undefined;
+  await user.save();
+  res.json({ success: true });
+});
+
+module.exports = {
+  login,
+  me,
+  changePassword,
+  getLoginEvents,
+  twoFactorSetup,
+  twoFactorEnable,
+  twoFactorDisable,
+};

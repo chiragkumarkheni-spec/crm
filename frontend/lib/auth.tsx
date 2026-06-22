@@ -12,11 +12,16 @@ import { useRouter } from 'next/navigation';
 import { api, setToken, getToken } from './api';
 import type { User } from './types';
 
+// login resolves to a result so the login page can show a 2FA code box when the
+// account has two-factor on.
+type LoginResult = { ok: true } | { twoFactorRequired: true; invalidCode: boolean };
+
 interface AuthState {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, code?: string) => Promise<LoginResult>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -94,15 +99,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false));
   }, []);
 
-  async function login(email: string, password: string) {
-    const data = await api.post<{ token: string; user: User }>(
-      '/api/auth/login',
-      { email, password, deviceId: getDeviceId() }
-    );
-    setToken(data.token);
-    writeCachedUser(data.user);
-    setUser(data.user);
+  async function login(
+    email: string,
+    password: string,
+    code?: string
+  ): Promise<LoginResult> {
+    const data = await api.post<{
+      token?: string;
+      user?: User;
+      twoFactorRequired?: boolean;
+      invalidCode?: boolean;
+    }>('/api/auth/login', { email, password, code, deviceId: getDeviceId() });
+    // 2FA is on for this account: ask the login page to collect the code.
+    if (data.twoFactorRequired) {
+      return { twoFactorRequired: true, invalidCode: !!data.invalidCode };
+    }
+    setToken(data.token as string);
+    writeCachedUser(data.user as User);
+    setUser(data.user as User);
     router.push('/dashboard');
+    return { ok: true };
   }
 
   const logout = useCallback(() => {
@@ -111,6 +127,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     router.push('/login');
   }, [router]);
+
+  // Re-pull the signed-in user from the server (e.g. after toggling 2FA) so the
+  // cached copy and UI reflect the change.
+  const refreshUser = useCallback(async () => {
+    try {
+      const d = await api.get<{ user: User }>('/api/auth/me');
+      setUser(d.user);
+      writeCachedUser(d.user);
+    } catch {
+      /* ignore — keep current user */
+    }
+  }, []);
 
   // Auto-logout after a stretch of NO user activity (security: a rep walks away
   // from the office PC). Background polling does NOT count — only real input
@@ -133,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, logout]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

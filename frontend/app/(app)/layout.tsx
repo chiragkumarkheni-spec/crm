@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useApiData } from '@/lib/useApiData';
 import { ChangePasswordModal } from '@/components/ChangePasswordModal';
+import { TwoFactorModal } from '@/components/TwoFactorModal';
 import type { Lead, Distributor } from '@/lib/types';
 import {
   IconDashboard,
@@ -45,6 +46,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [showPwd, setShowPwd] = useState(false);
+  const [show2FA, setShow2FA] = useState(false);
   // Follow-up list drives the global "Call now" reminder. We RE-FETCH every 30s
   // (so newly-scheduled follow-ups are picked up) and re-check the clock every
   // 15s (so a lead flips to "due" the moment its time arrives) — on EVERY page.
@@ -161,6 +163,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               🔑
             </button>
             <button
+              onClick={() => setShow2FA(true)}
+              title="Two-factor (2FA)"
+              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-stone-100 hover:text-brand-600"
+            >
+              🛡
+            </button>
+            <button
               onClick={logout}
               title="Logout"
               className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-stone-100 hover:text-rose-600"
@@ -207,6 +216,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 🔑
               </button>
               <button
+                onClick={() => setShow2FA(true)}
+                title="Two-factor (2FA)"
+                className="rounded-lg p-2 text-slate-500 hover:bg-stone-100"
+              >
+                🛡
+              </button>
+              <button
                 onClick={logout}
                 className="rounded-lg p-2 text-slate-500 hover:bg-stone-100"
               >
@@ -247,6 +263,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {showPwd && <ChangePasswordModal onClose={() => setShowPwd(false)} />}
+      {show2FA && <TwoFactorModal onClose={() => setShow2FA(false)} />}
     </div>
   );
 }

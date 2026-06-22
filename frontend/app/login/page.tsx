@@ -8,6 +8,8 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [needs2FA, setNeeds2FA] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -16,7 +18,13 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      const res = await login(email, password, needs2FA ? code : undefined);
+      if ('twoFactorRequired' in res) {
+        setNeeds2FA(true);
+        if (res.invalidCode) {
+          setError('Code galat hai — authenticator app me jo 6 digit dikh raha hai wahi daalo');
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
@@ -68,10 +76,29 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className={inputClass}
               placeholder="••••••••"
+              readOnly={needs2FA}
             />
           </Field>
+          {needs2FA && (
+            <Field label="Authenticator code (6 digit)">
+              <input
+                type="text"
+                inputMode="numeric"
+                autoFocus
+                required
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className={`${inputClass} tracking-[0.4em] text-center text-lg`}
+                placeholder="••••••"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                Apne authenticator app (Google Authenticator) me jo 6 digit code dikh raha
+                hai wahi daalo.
+              </p>
+            </Field>
+          )}
           <Button type="submit" disabled={loading} className="mt-2 w-full">
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Signing in…' : needs2FA ? 'Verify & sign in' : 'Sign in'}
           </Button>
         </form>
 

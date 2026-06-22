@@ -74,6 +74,12 @@ const updateUser = asyncHandler(async (req, res) => {
     user.deviceId = null;
     user.deviceBoundAt = undefined;
   }
+  // Admin recovery: a rep who lost their authenticator app is locked out of 2FA —
+  // admin can turn it off so they can log in with just their password again.
+  if (req.body.disable2FA) {
+    user.twoFactorEnabled = false;
+    user.twoFactorSecret = undefined;
+  }
   await user.save();
   res.json(user);
 });

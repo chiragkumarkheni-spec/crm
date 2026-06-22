@@ -8,6 +8,7 @@ export interface User {
   active: boolean;
   deviceId?: string | null;
   deviceBoundAt?: string;
+  twoFactorEnabled?: boolean;
   deleted?: boolean;
   deletedAt?: string;
   createdAt?: string;
