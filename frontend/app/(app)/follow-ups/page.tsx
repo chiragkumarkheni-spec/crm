@@ -6,6 +6,7 @@ import { useApiData } from '@/lib/useApiData';
 import type { Lead } from '@/lib/types';
 import { Card, StatusBadge, inputClass } from '@/components/ui';
 import { QuickFollowUp } from '@/components/QuickFollowUp';
+import { RepFilter } from '@/components/RepFilter';
 import { todayISO } from '@/lib/format';
 
 function fmtTime(d: string) {
@@ -37,16 +38,22 @@ export default function FollowUpsPage() {
   // preview which leads are scheduled for follow-up on that day.
   const [viewDate, setViewDate] = useState(todayISO());
   const isToday = viewDate === todayISO();
+  // Admin can view one rep's follow-ups (rep-wise). Reps always see only their own.
+  const [employeeId, setEmployeeId] = useState('');
 
   // Scheduled callbacks (time-based reminders) for the chosen day.
+  const followParams = new URLSearchParams();
+  if (!isToday) followParams.set('date', viewDate);
+  if (employeeId) followParams.set('employee', employeeId);
+  const followQs = followParams.toString();
   const { data, loading, refetch } = useApiData<Lead[]>(
-    isToday
-      ? '/api/leads/today-followups'
-      : `/api/leads/today-followups?date=${viewDate}`
+    `/api/leads/today-followups${followQs ? `?${followQs}` : ''}`
   );
   // New leads still to be called (the working backlog) — only relevant for today.
+  const newParams = new URLSearchParams({ status: 'new', unscheduled: 'true', limit: '50' });
+  if (employeeId) newParams.set('employee', employeeId);
   const { data: newData, refetch: refetchNew } = useApiData<{ items: Lead[]; total: number }>(
-    '/api/leads?status=new&unscheduled=true&limit=50'
+    `/api/leads?${newParams.toString()}`
   );
   const newLeads = newData?.items ?? [];
   const newCount = newData?.total ?? 0;
@@ -105,7 +112,8 @@ export default function FollowUpsPage() {
           </p>
         </div>
         {/* Date picker — aaj ke alawa kisi bhi din ke follow-up dekho */}
-        <div className="flex items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2">
+          <RepFilter value={employeeId} onChange={setEmployeeId} />
           <label className="flex flex-col gap-1 text-xs font-medium text-slate-500">
             Date dekho
             <input

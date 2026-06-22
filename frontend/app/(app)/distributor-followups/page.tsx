@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useApiData } from '@/lib/useApiData';
 import type { Distributor } from '@/lib/types';
 import { Card } from '@/components/ui';
+import { RepFilter } from '@/components/RepFilter';
 
 function fmtTime(d: string) {
   return new Date(d).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -14,8 +15,10 @@ function fmtDate(d: string) {
 }
 
 export default function DistributorFollowUpsPage() {
+  // Admin can view one rep's distributor follow-ups; reps see only their own.
+  const [employeeId, setEmployeeId] = useState('');
   const { data, loading, refetch } = useApiData<Distributor[]>(
-    '/api/distributors/today-followups'
+    `/api/distributors/today-followups${employeeId ? `?employee=${employeeId}` : ''}`
   );
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
@@ -42,12 +45,15 @@ export default function DistributorFollowUpsPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-2xl font-bold">Distributor follow-ups</h1>
-        <p className="text-slate-500 text-sm">
-          Existing distributors ke scheduled callbacks — leads se bilkul alag. Time pe{' '}
-          <span className="font-medium text-rose-600">🔴 Call now</span>.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Distributor follow-ups</h1>
+          <p className="text-slate-500 text-sm">
+            Existing distributors ke scheduled callbacks — leads se bilkul alag. Time pe{' '}
+            <span className="font-medium text-rose-600">🔴 Call now</span>.
+          </p>
+        </div>
+        <RepFilter value={employeeId} onChange={setEmployeeId} />
       </div>
 
       {loading && items.length === 0 ? (
