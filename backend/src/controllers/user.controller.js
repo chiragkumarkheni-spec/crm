@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
+const { passwordError } = require('../utils/password');
 
 // GET /api/users  (admin) — list active users, or the Recycle Bin (?deleted=true)
 const listUsers = asyncHandler(async (req, res) => {
@@ -18,9 +19,10 @@ const createUser = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('name, email and password are required');
   }
-  if (String(password).length < 6) {
+  const pErr = passwordError(password);
+  if (pErr) {
     res.status(400);
-    throw new Error('Password kam se kam 6 character ka hona chahiye');
+    throw new Error(pErr);
   }
   const exists = await User.findOne({ email: email.toLowerCase() });
   if (exists) {
@@ -60,9 +62,10 @@ const updateUser = asyncHandler(async (req, res) => {
   if (role !== undefined) user.role = role === 'admin' ? 'admin' : 'employee';
   if (active !== undefined) user.active = !!active;
   if (password) {
-    if (String(password).length < 6) {
+    const pErr = passwordError(password);
+    if (pErr) {
       res.status(400);
-      throw new Error('Password kam se kam 6 character ka hona chahiye');
+      throw new Error(pErr);
     }
     await user.setPassword(password);
   }

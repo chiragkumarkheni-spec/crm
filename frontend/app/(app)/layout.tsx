@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useApiData } from '@/lib/useApiData';
+import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import type { Lead, Distributor } from '@/lib/types';
 import {
   IconDashboard,
@@ -43,6 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [showPwd, setShowPwd] = useState(false);
   // Follow-up list drives the global "Call now" reminder. We RE-FETCH every 30s
   // (so newly-scheduled follow-ups are picked up) and re-check the clock every
   // 15s (so a lead flips to "due" the moment its time arrives) — on EVERY page.
@@ -152,6 +154,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <p className="truncate text-xs capitalize text-slate-400">{user.role}</p>
             </div>
             <button
+              onClick={() => setShowPwd(true)}
+              title="Password badlo"
+              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-stone-100 hover:text-brand-600"
+            >
+              🔑
+            </button>
+            <button
               onClick={logout}
               title="Logout"
               className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-stone-100 hover:text-rose-600"
@@ -189,12 +198,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </span>
               <span className="font-bold">Nexton CRM</span>
             </div>
-            <button
-              onClick={logout}
-              className="rounded-lg p-2 text-slate-500 hover:bg-stone-100"
-            >
-              <IconLogout className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowPwd(true)}
+                title="Password badlo"
+                className="rounded-lg p-2 text-slate-500 hover:bg-stone-100"
+              >
+                🔑
+              </button>
+              <button
+                onClick={logout}
+                className="rounded-lg p-2 text-slate-500 hover:bg-stone-100"
+              >
+                <IconLogout className="h-5 w-5" />
+              </button>
+            </div>
           </div>
           <nav className="flex gap-1 overflow-x-auto px-3 pb-2">
             {items.map((n) => {
@@ -227,6 +245,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {showPwd && <ChangePasswordModal onClose={() => setShowPwd(false)} />}
     </div>
   );
 }

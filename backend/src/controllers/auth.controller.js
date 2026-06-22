@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const { signToken } = require('../utils/token');
+const { passwordError } = require('../utils/password');
 
 // Brute-force lockout settings: after this many wrong passwords in a row, the
 // account is frozen for the cool-off window so a robot cannot keep guessing.
@@ -81,4 +82,40 @@ const me = asyncHandler(async (req, res) => {
   res.json({ user: req.user });
 });
 
-module.exports = { login, me };
+// POST /api/auth/change-password — a logged-in user changes their OWN password.
+//   body: { currentPassword, newPassword }
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    res.status(400);
+    throw new Error('Current aur naya password dono chahiye');
+  }
+  // Re-fetch WITH the hash (it is select:false by default).
+  const user = await User.findById(req.user._id).select('+passwordHash');
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+  const ok = await user.comparePassword(currentPassword);
+  if (!ok) {
+    res.status(401);
+    throw new Error('Current password galat hai');
+  }
+  const weak = passwordError(newPassword);
+  if (weak) {
+    res.status(400);
+    throw new Error(weak);
+  }
+  if (await user.comparePassword(newPassword)) {
+    res.status(400);
+    throw new Error('Naya password purane se alag hona chahiye');
+  }
+  await user.setPassword(newPassword);
+  // A fresh password clears any brute-force lock/counter.
+  user.failedLoginAttempts = 0;
+  user.lockUntil = undefined;
+  await user.save();
+  res.json({ success: true });
+});
+
+module.exports = { login, me, changePassword };
