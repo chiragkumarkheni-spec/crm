@@ -19,6 +19,9 @@ build/
 # Vercel
 .vercel
 
+# Local DB backups (never commit data dumps)
+backend/backups/
+
 # Logs
 *.log
 npm-debug.log*

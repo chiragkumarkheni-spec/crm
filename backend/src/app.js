@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/error');
@@ -15,6 +16,11 @@ const activityRoutes = require('./routes/activity.routes');
 const distributorRoutes = require('./routes/distributor.routes');
 
 const app = express();
+
+// We sit behind Vercel's proxy — trust exactly ONE hop so req.ip is the real
+// client IP (from X-Forwarded-For) for rate limiting, not the proxy. (Using a
+// fixed hop count, not `true`, so a client can't spoof its way past the limiter.)
+app.set('trust proxy', 1);
 
 // Don't advertise the server framework (one less hint for an attacker).
 app.disable('x-powered-by');
@@ -55,6 +61,28 @@ app.get('/', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
+
+// --- Rate limiting (abuse / brute-force / DDoS guard) ---
+// Per client IP. On serverless the in-memory counter is per warm instance, so it
+// is a useful extra layer on top of the DB-backed per-account login lockout — not
+// the only defence. Limits are generous so a shared office IP with several reps
+// is never throttled during normal work; only a runaway script trips them.
+const apiLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 1000, // ~200 req/min per IP — way above real use, blocks floods
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Bahut zyada requests aa rahi hain — thodi der baad try karo.' },
+});
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50, // 50 login attempts / 15 min per IP (complements the per-account lock)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Bahut baar login try hua — thodi der baad try karo.' },
+});
+app.use('/api/auth/login', loginLimiter);
+app.use('/api', apiLimiter);
 
 // Ensure a DB connection exists before handling any data request below.
 app.use(async (req, res, next) => {

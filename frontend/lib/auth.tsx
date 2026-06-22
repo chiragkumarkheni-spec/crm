@@ -3,6 +3,7 @@
 import {
   createContext,
   useContext,
+  useCallback,
   useEffect,
   useState,
   ReactNode,
@@ -104,12 +105,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/dashboard');
   }
 
-  function logout() {
+  const logout = useCallback(() => {
     setToken(null);
     writeCachedUser(null);
     setUser(null);
     router.push('/login');
-  }
+  }, [router]);
+
+  // Auto-logout after a stretch of NO user activity (security: a rep walks away
+  // from the office PC). Background polling does NOT count — only real input
+  // events (move/click/key/scroll/touch) reset the timer.
+  useEffect(() => {
+    if (!user) return;
+    const INACTIVITY_MS = 10 * 60 * 1000; // 10 minutes
+    let timer: ReturnType<typeof setTimeout>;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(logout, INACTIVITY_MS);
+    };
+    const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
+    reset();
+    return () => {
+      clearTimeout(timer);
+      events.forEach((e) => window.removeEventListener(e, reset));
+    };
+  }, [user, logout]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout }}>
