@@ -145,11 +145,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // events (move/click/key/scroll/touch) reset the timer.
   useEffect(() => {
     if (!user) return;
-    const INACTIVITY_MS = 10 * 60 * 1000; // 10 minutes
+    const TEN_MIN = 10 * 60 * 1000;
+    const TWENTY_MIN = 20 * 60 * 1000;
+    const ONE_HOUR = 60 * 60 * 1000;
+    // Office hours are 09:30–18:00 (local time).
+    const inOfficeHours = () => {
+      const now = new Date();
+      const mins = now.getHours() * 60 + now.getMinutes();
+      return mins >= 9 * 60 + 30 && mins < 18 * 60;
+    };
+    // During office hours admins get 1 hour and reps get 20 minutes of idle
+    // time. Outside office hours everyone falls back to the strict 10-minute
+    // timeout. Recomputed on every reset so the window tightens automatically
+    // once 18:00 passes.
+    const idleMs = () => {
+      if (!inOfficeHours()) return TEN_MIN;
+      return user.role === 'admin' ? ONE_HOUR : TWENTY_MIN;
+    };
     let timer: ReturnType<typeof setTimeout>;
     const reset = () => {
       clearTimeout(timer);
-      timer = setTimeout(logout, INACTIVITY_MS);
+      timer = setTimeout(logout, idleMs());
     };
     const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
     events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
