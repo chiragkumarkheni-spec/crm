@@ -64,6 +64,11 @@ export interface Lead {
   order: { value: number; currency: string; note?: string };
   notes?: string;
   createdAt: string;
+  // Set only by GET /today-followups — the most recent call note (rep's own words)
+  // so a popped-up callback can be told apart from other due leads at a glance.
+  lastNote?: string;
+  lastOutcome?: Outcome;
+  lastCallDate?: string;
 }
 
 export interface Activity {

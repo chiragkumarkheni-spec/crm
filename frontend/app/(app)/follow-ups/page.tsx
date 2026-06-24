@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useApiData } from '@/lib/useApiData';
 import type { Lead } from '@/lib/types';
+import { OUTCOME_LABELS } from '@/lib/types';
 import { Card, StatusBadge, inputClass } from '@/components/ui';
 import { QuickFollowUp } from '@/components/QuickFollowUp';
 import { RepFilter } from '@/components/RepFilter';
+import { richText } from '@/components/RichNote';
 import { todayISO } from '@/lib/format';
 
 function fmtTime(d: string) {
@@ -31,6 +33,35 @@ function fmtLongDate(iso: string) {
     month: 'short',
     year: 'numeric',
   });
+}
+
+// The "why am I calling this lead back" line. When several callbacks pop at the
+// same time the rep can't tell them apart from name + number alone — so we show
+// the product asked for and the rep's OWN last call note (plain-text preview).
+function LastCall({ lead }: { lead: Lead }) {
+  const note = richText(lead.lastNote || '');
+  if (!lead.product && !note) return null;
+  return (
+    <div className="mt-2 rounded-lg bg-stone-50 px-3 py-2 text-sm">
+      {lead.product && (
+        <p className="text-slate-600">
+          📦 <span className="font-medium">{lead.product}</span>
+          {lead.quantity ? <span className="text-slate-400"> · {lead.quantity}</span> : null}
+        </p>
+      )}
+      {note && (
+        <p className="mt-0.5 line-clamp-2 text-slate-700">
+          <span className="font-medium text-slate-500">Last:</span>{' '}
+          {lead.lastOutcome ? (
+            <span className="font-medium text-slate-600">
+              {OUTCOME_LABELS[lead.lastOutcome]} —{' '}
+            </span>
+          ) : null}
+          {note}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export default function FollowUpsPage() {
@@ -165,6 +196,7 @@ export default function FollowUpsPage() {
                     </div>
                     <StatusBadge status={lead.status} />
                   </div>
+                  <LastCall lead={lead} />
                 </Card>
               </Link>
             ))}
@@ -230,6 +262,7 @@ export default function FollowUpsPage() {
                         <StatusBadge status={lead.status} />
                       </div>
                     </div>
+                    <LastCall lead={lead} />
                     <QuickFollowUp
                       leadId={lead._id}
                       mobile={lead.mobileNumber}
@@ -263,6 +296,7 @@ export default function FollowUpsPage() {
                     </Link>
                     <StatusBadge status={lead.status} />
                   </div>
+                  <LastCall lead={lead} />
                   <QuickFollowUp
                     leadId={lead._id}
                     mobile={lead.mobileNumber}

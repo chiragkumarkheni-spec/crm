@@ -27,6 +27,21 @@ function chipDate(key: string): Date {
   return now;
 }
 
+// "HH:MM" (today) → a Date for that exact clock time TODAY. If the rep picks a
+// time that has already passed today, push it to the SAME time tomorrow (a
+// past-time callback would otherwise pop up as overdue immediately).
+function timeToday(hhmm: string): Date | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  const d = new Date();
+  d.setHours(h, min, 0, 0);
+  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1); // already past → kal usi time
+  return d;
+}
+
 const chipBtn =
   'rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 ' +
   'hover:border-brand-400 hover:bg-brand-50 disabled:opacity-50';
@@ -45,15 +60,19 @@ export function QuickFollowUp({
   const [mode, setMode] = useState<'idle' | 'call' | 'nopickup'>('idle');
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  // Exact same-day time the rep typed ("aaj 3:00 baje"), as an "HH:MM" string.
+  const [time, setTime] = useState('');
 
-  async function logNoPickup(key: string) {
+  // Log a no-pickup + schedule the next callback at the given moment. `note` lets
+  // an exact-time pick record the chosen time so the reminder reads clearly.
+  async function reschedule(when: Date, note = 'Nahi uthaya') {
     if (busy) return;
     setBusy(true);
     try {
       await api.post(`/api/leads/${leadId}/followups`, {
         outcome: 'no_pickup',
-        development: 'Nahi uthaya',
-        nextFollowUpDate: chipDate(key).toISOString(),
+        development: note,
+        nextFollowUpDate: when.toISOString(),
       });
       setDone(true);
       onDone?.();
@@ -62,6 +81,18 @@ export function QuickFollowUp({
     } finally {
       setBusy(false);
     }
+  }
+
+  function logNoPickup(key: string) {
+    return reschedule(chipDate(key));
+  }
+
+  function logExactTime() {
+    const when = timeToday(time);
+    if (!when) return;
+    const isTomorrow = when.getDate() !== new Date().getDate();
+    const label = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    reschedule(when, `Nahi uthaya — ${isTomorrow ? 'kal' : 'aaj'} ${label} baje call karna`);
   }
 
   if (done) {
@@ -94,19 +125,40 @@ export function QuickFollowUp({
       {mode === 'call' && <CallQR mobile={mobile} />}
 
       {mode === 'nopickup' && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl bg-stone-50 p-2.5">
-          <span className="text-xs font-medium text-slate-500">Dobara kab?</span>
-          {CHIPS.map((c) => (
-            <button
-              key={c.key}
-              type="button"
+        <div className="flex flex-col gap-2 rounded-xl bg-stone-50 p-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">Dobara kab?</span>
+            {CHIPS.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                disabled={busy}
+                onClick={() => logNoPickup(c.key)}
+                className={chipBtn}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          {/* Exact same-day time — "aaj 2 baje / 3 baje / kabhi bhi". */}
+          <div className="flex flex-wrap items-center gap-2 border-t border-stone-200 pt-2">
+            <span className="text-xs font-medium text-slate-500">ya exact time:</span>
+            <input
+              type="time"
+              value={time}
               disabled={busy}
-              onClick={() => logNoPickup(c.key)}
-              className={chipBtn}
+              onChange={(e) => setTime(e.target.value)}
+              className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-sm text-slate-700"
+            />
+            <button
+              type="button"
+              disabled={busy || !time}
+              onClick={logExactTime}
+              className="rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
             >
-              {c.label}
+              Set
             </button>
-          ))}
+          </div>
         </div>
       )}
     </div>

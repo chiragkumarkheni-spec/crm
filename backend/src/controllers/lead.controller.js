@@ -204,6 +204,35 @@ const todayFollowUps = asyncHandler(async (req, res) => {
     .populate('assignedTo', 'name email')
     .sort({ nextFollowUpDate: 1, createdAt: -1 })
     .lean();
+
+  // Attach each lead's MOST RECENT call note so the rep can tell the leads apart
+  // when several callbacks pop at once. A scheduled "call back in 2 hrs" reminder
+  // is useless if the rep can't remember what was said last time — the last
+  // `development` note (the rep's own words + outcome) is that context.
+  if (leads.length) {
+    const latest = await FollowUp.aggregate([
+      { $match: { lead: { $in: leads.map((l) => l._id) } } },
+      { $sort: { date: -1, createdAt: -1 } },
+      {
+        $group: {
+          _id: '$lead',
+          development: { $first: '$development' },
+          outcome: { $first: '$outcome' },
+          date: { $first: '$date' },
+        },
+      },
+    ]);
+    const byLead = new Map(latest.map((f) => [f._id.toString(), f]));
+    for (const lead of leads) {
+      const f = byLead.get(lead._id.toString());
+      if (f) {
+        lead.lastNote = f.development;
+        lead.lastOutcome = f.outcome;
+        lead.lastCallDate = f.date;
+      }
+    }
+  }
+
   res.json(leads);
 });
 
