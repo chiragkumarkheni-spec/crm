@@ -24,8 +24,8 @@ function chipDate(key: string): Date {
   const ms = Date.now();
   if (key === '2h') return new Date(ms + 2 * 3600000);
   if (key === 'eve') {
-    // Today 6 PM India time; if already past, just +2h.
-    const d = istWallToDate(istTodayISO(), '18:00');
+    // Today 7 PM India time; if already past, just +2h.
+    const d = istWallToDate(istTodayISO(), '19:00');
     return d && d.getTime() > ms ? d : new Date(ms + 2 * 3600000);
   }
   if (key === 'kal') return new Date(ms + 24 * 3600000);
