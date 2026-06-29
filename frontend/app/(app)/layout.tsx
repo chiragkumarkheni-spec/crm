@@ -63,7 +63,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const suspiciousCount = loginSec?.summary?.suspicious?.length ?? 0;
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
-    const tick = setInterval(() => setNowTs(Date.now()), 15000);
+    // This tick re-renders the WHOLE app shell (sidebar + nav + banners) on every
+    // page. Keep it at 30s — a due-now badge that updates within 30s is plenty,
+    // and on a weak PC a full-shell re-render every few seconds is needless jank.
+    const tick = setInterval(() => setNowTs(Date.now()), 30000);
     const poll = setInterval(() => {
       refetch();
       refetchDist();

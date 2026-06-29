@@ -1,9 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useApiData } from '@/lib/useApiData';
 import { useAuth } from '@/lib/auth';
 import type { Activity } from '@/lib/types';
-import { Card } from '@/components/ui';
+import { Card, Button } from '@/components/ui';
 
 const META: Record<string, { icon: string; verb: string; color: string }> = {
   lead_created: { icon: '🆕', verb: 'added lead', color: 'text-green-700' },
@@ -41,6 +42,16 @@ export default function ActivityPage() {
   const { data, loading } = useApiData<{ items: Activity[] }>('/api/activity');
   const items = data?.items ?? [];
 
+  // Render one page (40 rows) at a time. The server already sends a bounded list,
+  // but painting 150 list items at once is visible jank on a weak PC — so we slice
+  // it client-side and let the rep page through. No extra network calls.
+  const PER_PAGE = 40;
+  const [page, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(items.length / PER_PAGE));
+  const safePage = Math.min(page, pages);
+  const start = (safePage - 1) * PER_PAGE;
+  const pageItems = items.slice(start, start + PER_PAGE);
+
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -58,9 +69,10 @@ export default function ActivityPage() {
           <p className="text-slate-500">Abhi koi activity nahi. Kaam karte hi yahan dikhne lagega.</p>
         </Card>
       ) : (
+        <>
         <Card className="overflow-hidden p-0">
           <ul className="divide-y divide-stone-100">
-            {items.map((a) => {
+            {pageItems.map((a) => {
               const m = META[a.action] || {
                 icon: '•',
                 verb: a.action,
@@ -85,6 +97,31 @@ export default function ActivityPage() {
             })}
           </ul>
         </Card>
+        {pages > 1 && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-sm text-slate-500">
+              Showing {start + 1}–{Math.min(start + PER_PAGE, items.length)} of {items.length}
+              {' · '}Page {safePage} of {pages}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                disabled={safePage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Previous
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={safePage >= pages}
+                onClick={() => setPage((p) => Math.min(pages, p + 1))}
+              >
+                Next →
+              </Button>
+            </div>
+          </div>
+        )}
+        </>
       )}
     </div>
   );
