@@ -9,24 +9,19 @@ import { OUTCOME_LABELS } from '@/lib/types';
 import { Card, Button, Field, inputClass, StatusBadge } from '@/components/ui';
 import { CallQR } from '@/components/CallQR';
 import { RichNote, richText } from '@/components/RichNote';
-import { formatDate, formatDateTime, formatMoney, todayISO } from '@/lib/format';
+import {
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  todayISO,
+  isSameDay,
+  istWallToDate,
+} from '@/lib/format';
 
 // True if the given timestamp is within the last 24 hours (a rep's correction window).
 function within24h(dateStr?: string): boolean {
   if (!dateStr) return false;
   return (Date.now() - new Date(dateStr).getTime()) / 3600000 <= 24;
-}
-
-// True if the given date string falls on the user's current calendar day.
-function isSameDay(dateStr?: string): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
 }
 
 export default function LeadDetailPage() {
@@ -682,12 +677,13 @@ function FollowUpForm({ leadId, onSaved }: { leadId: string; onSaved: () => void
       return;
     }
 
-    // Combine date + time into a full datetime. Future days with no time default
-    // to 9:00 AM so the lead surfaces that morning.
+    // Combine date + time into a full datetime, read as INDIA time (not the PC's
+    // local zone). Future days with no time default to 9:00 AM IST so the lead
+    // surfaces that morning.
     let nextISO: string | undefined;
     if (outcome !== 'converted' && nextFollowUpDate) {
-      const dt = new Date(`${nextFollowUpDate}T${nextFollowUpTime || '09:00'}`);
-      nextISO = isNaN(dt.getTime()) ? undefined : dt.toISOString();
+      const dt = istWallToDate(nextFollowUpDate, nextFollowUpTime || '09:00');
+      nextISO = dt ? dt.toISOString() : undefined;
     }
 
     setSaving(true);

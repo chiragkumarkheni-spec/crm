@@ -9,25 +9,33 @@ import { Card, StatusBadge, inputClass } from '@/components/ui';
 import { QuickFollowUp } from '@/components/QuickFollowUp';
 import { RepFilter } from '@/components/RepFilter';
 import { richText } from '@/components/RichNote';
-import { todayISO } from '@/lib/format';
+import { todayISO, istParts, IST_TZ } from '@/lib/format';
 
 function fmtTime(d: string) {
-  return new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  return new Date(d).toLocaleTimeString([], {
+    timeZone: IST_TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 }
 function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString([], { day: '2-digit', month: 'short' });
+  return new Date(d).toLocaleDateString([], { timeZone: IST_TZ, day: '2-digit', month: 'short' });
 }
-// How many FULL days a scheduled follow-up is late (0 = due today, not late).
+// How many FULL days (in IST) a scheduled follow-up is late (0 = due today).
 function daysLate(iso?: string): number {
   if (!iso) return 0;
-  const sched = new Date(iso);
-  sched.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.floor((today.getTime() - sched.getTime()) / 86400000);
+  const s = istParts(new Date(iso));
+  const t = istParts();
+  const schedMidUTC = Date.UTC(s.year, s.month - 1, s.day);
+  const todayMidUTC = Date.UTC(t.year, t.month - 1, t.day);
+  return Math.floor((todayMidUTC - schedMidUTC) / 86400000);
 }
 function fmtLongDate(iso: string) {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString([], {
+  // `iso` is an IST calendar day (yyyy-mm-dd) — pin it to IST midnight so the
+  // weekday/date shown is that exact day regardless of the viewer's timezone.
+  return new Date(`${iso}T00:00:00+05:30`).toLocaleDateString([], {
+    timeZone: IST_TZ,
     weekday: 'short',
     day: '2-digit',
     month: 'short',

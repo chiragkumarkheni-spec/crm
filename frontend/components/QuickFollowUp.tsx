@@ -2,7 +2,14 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import { istParts, istWallToDate } from '@/lib/format';
 import { CallQR } from './CallQR';
+
+// Today's IST calendar day as "YYYY-MM-DD".
+function istTodayISO(): string {
+  const { year, month, day } = istParts();
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
 
 // Reschedule presets shown after "Nahi uthaya" — one tap logs a no-pickup AND sets
 // the next follow-up, so the rep never opens the lead for the 70%-common case.
@@ -14,32 +21,25 @@ const CHIPS: { key: string; label: string }[] = [
 ];
 
 function chipDate(key: string): Date {
-  const now = new Date();
-  const ms = now.getTime();
+  const ms = Date.now();
   if (key === '2h') return new Date(ms + 2 * 3600000);
   if (key === 'eve') {
-    const d = new Date(now);
-    d.setHours(18, 0, 0, 0); // today 6 PM; if already past, just +2h
-    return d.getTime() > ms ? d : new Date(ms + 2 * 3600000);
+    // Today 6 PM India time; if already past, just +2h.
+    const d = istWallToDate(istTodayISO(), '18:00');
+    return d && d.getTime() > ms ? d : new Date(ms + 2 * 3600000);
   }
   if (key === 'kal') return new Date(ms + 24 * 3600000);
   if (key === '3d') return new Date(ms + 3 * 24 * 3600000);
-  return now;
+  return new Date(ms);
 }
 
-// "HH:MM" (today) → a Date for that exact clock time TODAY. If the rep picks a
-// time that has already passed today, push it to the SAME time tomorrow (a
-// past-time callback would otherwise pop up as overdue immediately).
+// "HH:MM" → that exact clock time TODAY in India time. If the rep picks a time
+// that has already passed today, push it to the SAME time tomorrow (a past-time
+// callback would otherwise pop up as overdue immediately).
 function timeToday(hhmm: string): Date | null {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (h > 23 || min > 59) return null;
-  const d = new Date();
-  d.setHours(h, min, 0, 0);
-  if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 1); // already past → kal usi time
-  return d;
+  const d = istWallToDate(istTodayISO(), hhmm);
+  if (!d) return null;
+  return d.getTime() <= Date.now() ? new Date(d.getTime() + 24 * 3600000) : d;
 }
 
 const chipBtn =
@@ -90,8 +90,10 @@ export function QuickFollowUp({
   function logExactTime() {
     const when = timeToday(time);
     if (!when) return;
-    const isTomorrow = when.getDate() !== new Date().getDate();
-    const label = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    // Label in India time (aaj/kal + HH:MM) so it reads right on any PC.
+    const w = istParts(when);
+    const isTomorrow = w.day !== istParts().day;
+    const label = `${String(w.hour).padStart(2, '0')}:${String(w.minute).padStart(2, '0')}`;
     reschedule(when, `Nahi uthaya — ${isTomorrow ? 'kal' : 'aaj'} ${label} baje call karna`);
   }
 

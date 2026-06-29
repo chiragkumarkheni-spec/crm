@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, setToken, getToken } from './api';
+import { istMinutesOfDay } from './format';
 import type { User } from './types';
 
 // login resolves to a result so the login page can show a 2FA code box when the
@@ -148,11 +149,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const TEN_MIN = 10 * 60 * 1000;
     const TWENTY_MIN = 20 * 60 * 1000;
     const ONE_HOUR = 60 * 60 * 1000;
-    // Office hours are 09:30–18:00 (local time).
+    // Office hours are 09:30–19:00 India time (NOT the PC's local time, which may
+    // be set wrong — that was logging reps out mid-day on a 10-min strict timeout).
     const inOfficeHours = () => {
-      const now = new Date();
-      const mins = now.getHours() * 60 + now.getMinutes();
-      return mins >= 9 * 60 + 30 && mins < 18 * 60;
+      const mins = istMinutesOfDay();
+      return mins >= 9 * 60 + 30 && mins < 19 * 60;
     };
     // During office hours admins get 1 hour and reps get 20 minutes of idle
     // time. Outside office hours everyone falls back to the strict 10-minute
