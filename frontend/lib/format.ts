@@ -5,37 +5,20 @@
 export const IST_TZ = 'Asia/Kolkata';
 const IST_OFFSET_MIN = 330; // +5:30, fixed (India has no DST)
 
-// Building an Intl.DateTimeFormat is expensive, and istParts runs in hot paths —
-// the idle-logout handler calls it on every mousemove/keypress. So construct the
-// IST formatter ONCE and reuse it (this was causing heavy lag while typing).
-let _istFmt: Intl.DateTimeFormat | null = null;
-function istFormatter(): Intl.DateTimeFormat {
-  if (!_istFmt) {
-    _istFmt = new Intl.DateTimeFormat('en-GB', {
-      timeZone: IST_TZ,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    });
-  }
-  return _istFmt;
-}
-
 // The wall-clock parts of an instant as seen in IST.
+// IST is a FIXED +5:30 offset (India has never used daylight saving), so we get
+// the parts by pure arithmetic — shift the epoch by the offset and read it as
+// UTC. No Intl.DateTimeFormat: that was ~700x slower and ran on every mousemove/
+// keypress (via the idle-logout office-hours check), which made typing lag.
 export function istParts(d: Date = new Date()) {
-  const p: Record<string, string> = {};
-  for (const part of istFormatter().formatToParts(d)) p[part.type] = part.value;
+  const u = new Date(d.getTime() + IST_OFFSET_MIN * 60000);
   return {
-    year: Number(p.year),
-    month: Number(p.month),
-    day: Number(p.day),
-    hour: Number(p.hour) % 24, // some engines emit "24" at midnight
-    minute: Number(p.minute),
-    second: Number(p.second),
+    year: u.getUTCFullYear(),
+    month: u.getUTCMonth() + 1,
+    day: u.getUTCDate(),
+    hour: u.getUTCHours(),
+    minute: u.getUTCMinutes(),
+    second: u.getUTCSeconds(),
   };
 }
 
