@@ -5,20 +5,30 @@
 export const IST_TZ = 'Asia/Kolkata';
 const IST_OFFSET_MIN = 330; // +5:30, fixed (India has no DST)
 
+// Building an Intl.DateTimeFormat is expensive, and istParts runs in hot paths —
+// the idle-logout handler calls it on every mousemove/keypress. So construct the
+// IST formatter ONCE and reuse it (this was causing heavy lag while typing).
+let _istFmt: Intl.DateTimeFormat | null = null;
+function istFormatter(): Intl.DateTimeFormat {
+  if (!_istFmt) {
+    _istFmt = new Intl.DateTimeFormat('en-GB', {
+      timeZone: IST_TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+  }
+  return _istFmt;
+}
+
 // The wall-clock parts of an instant as seen in IST.
 export function istParts(d: Date = new Date()) {
-  const fmt = new Intl.DateTimeFormat('en-GB', {
-    timeZone: IST_TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
   const p: Record<string, string> = {};
-  for (const part of fmt.formatToParts(d)) p[part.type] = part.value;
+  for (const part of istFormatter().formatToParts(d)) p[part.type] = part.value;
   return {
     year: Number(p.year),
     month: Number(p.month),
