@@ -157,23 +157,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     // During office hours admins get 1 hour and reps get 20 minutes of idle
     // time. Outside office hours everyone falls back to the strict 10-minute
-    // timeout. Recomputed on every reset so the window tightens automatically
-    // once 18:00 passes.
+    // timeout. Recomputed on each idle check so the window tightens automatically
+    // once 19:00 passes.
     const idleMs = () => {
       if (!inOfficeHours()) return TEN_MIN;
       return user.role === 'admin' ? ONE_HOUR : TWENTY_MIN;
     };
-    let timer: ReturnType<typeof setTimeout>;
-    const reset = () => {
-      clearTimeout(timer);
-      timer = setTimeout(logout, idleMs());
+    // The input handler does the ABSOLUTE MINIMUM — it only stamps the time of
+    // the last activity. This is what keeps a weak/old PC smooth: mousemove and
+    // keydown can fire hundreds of times a second, and the previous version armed
+    // a fresh setTimeout AND computed the office-hours clock on every single one
+    // of those events. Now there is no per-event timer churn and no clock math —
+    // a single low-frequency interval (below) does the actual idle check.
+    let lastActive = Date.now();
+    const mark = () => {
+      lastActive = Date.now();
     };
     const events = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
-    events.forEach((e) => window.addEventListener(e, reset, { passive: true }));
-    reset();
+    events.forEach((e) => window.addEventListener(e, mark, { passive: true }));
+    // Check idleness every 30s instead of re-arming a timer on each keypress.
+    // Worst case the logout fires up to 30s after the threshold — irrelevant for
+    // a 10-to-60-minute idle window, and it costs the PC almost nothing.
+    const check = setInterval(() => {
+      if (Date.now() - lastActive >= idleMs()) logout();
+    }, 30000);
     return () => {
-      clearTimeout(timer);
-      events.forEach((e) => window.removeEventListener(e, reset));
+      clearInterval(check);
+      events.forEach((e) => window.removeEventListener(e, mark));
     };
   }, [user, logout]);
 

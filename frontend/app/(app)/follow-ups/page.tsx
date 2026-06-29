@@ -103,11 +103,14 @@ export default function FollowUpsPage() {
     refetchNew();
   };
 
-  // Re-check the clock every 15s (flip to "Call now" on time) and re-fetch every
-  // 30s (pick up newly-scheduled follow-ups) without a manual refresh.
+  // Re-check the clock every 30s (flip to "Call now" on time) and re-fetch every
+  // 30s (pick up newly-scheduled follow-ups) without a manual refresh. The clock
+  // tick re-renders the whole list, so we keep it infrequent — on a weak PC a
+  // full re-render every few seconds is visible jank; 30s is plenty (a callback
+  // appears within 30s of its time).
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
-    const tick = setInterval(() => setNowTs(Date.now()), 15000);
+    const tick = setInterval(() => setNowTs(Date.now()), 30000);
     const poll = setInterval(() => refetch(), 30000);
     return () => {
       clearInterval(tick);
