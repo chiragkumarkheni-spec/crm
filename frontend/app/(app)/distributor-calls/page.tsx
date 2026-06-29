@@ -6,7 +6,7 @@ import { useApiData } from '@/lib/useApiData';
 import { useAuth } from '@/lib/auth';
 import type { DistributorCallDetail } from '@/lib/types';
 import { DISTRIBUTOR_CATEGORIES } from '@/lib/types';
-import { Card, Field, inputClass } from '@/components/ui';
+import { Card, Field, inputClass, Button } from '@/components/ui';
 import { formatDateTime, formatMoney, todayISO } from '@/lib/format';
 
 export default function DistributorCallsPage() {
@@ -31,6 +31,15 @@ export default function DistributorCallsPage() {
     `/api/reports/distributor-calls?${p.toString()}`
   );
   const items = data?.items ?? [];
+
+  // Paginate client-side — the date range can return up to ~1000 rows and
+  // painting them all at once is heavy on a weak PC.
+  const PER_PAGE = 40;
+  const [page, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(items.length / PER_PAGE));
+  const safePage = Math.min(page, pages);
+  const startIdx = (safePage - 1) * PER_PAGE;
+  const pageItems = items.slice(startIdx, startIdx + PER_PAGE);
 
   return (
     <div className="flex flex-col gap-4">
@@ -83,7 +92,7 @@ export default function DistributorCallsPage() {
             </tr>
           </thead>
           <tbody>
-            {items.map((c) => (
+            {pageItems.map((c) => (
               <tr key={c._id} className="border-t border-stone-100">
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatDateTime(c.date)}</td>
                 <td className="px-4 py-3">
@@ -121,6 +130,31 @@ export default function DistributorCallsPage() {
           </tbody>
         </table>
       </Card>
+
+      {pages > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm text-slate-500">
+            Showing {startIdx + 1}–{Math.min(startIdx + PER_PAGE, items.length)} of {items.length}
+            {' · '}Page {safePage} of {pages}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              disabled={safePage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              ← Previous
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={safePage >= pages}
+              onClick={() => setPage((p) => Math.min(pages, p + 1))}
+            >
+              Next →
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

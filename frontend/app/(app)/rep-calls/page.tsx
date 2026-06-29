@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { useApiData } from '@/lib/useApiData';
 import type { User, ReportSummary } from '@/lib/types';
 import { OUTCOME_LABELS, DISTRIBUTOR_CATEGORIES } from '@/lib/types';
-import { inputClass } from '@/components/ui';
+import { inputClass, Button } from '@/components/ui';
 import { formatMoney } from '@/lib/format';
 
 type RepCall = {
@@ -103,6 +103,14 @@ function RepColumn({
   const monthOrders =
     (summary?.monthlyOrderValue ?? 0) + (summary?.monthlyDistributorOrderValue ?? 0);
 
+  // Paginate each column so a weak PC paints ~25 rows, not the whole recent log.
+  const PER_PAGE = 25;
+  const [page, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(items.length / PER_PAGE));
+  const safePage = Math.min(page, pages);
+  const start = (safePage - 1) * PER_PAGE;
+  const pageItems = items.slice(start, start + PER_PAGE);
+
   return (
     <div className={`flex flex-col gap-3 rounded-2xl border-t-4 bg-white p-3 shadow-sm ${accent}`}>
       <div className="flex items-center justify-between gap-2">
@@ -132,11 +140,37 @@ function RepColumn({
       ) : items.length === 0 ? (
         <p className="px-1 text-sm text-slate-400">Is rep ka koi call log nahi.</p>
       ) : (
-        <div className="max-h-[74vh] divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-100">
-          {items.map((c) => (
-            <CallRow key={c._id} call={c} />
-          ))}
-        </div>
+        <>
+          <div className="max-h-[74vh] divide-y divide-stone-100 overflow-y-auto rounded-lg border border-stone-100">
+            {pageItems.map((c) => (
+              <CallRow key={c._id} call={c} />
+            ))}
+          </div>
+          {pages > 1 && (
+            <div className="flex items-center justify-between gap-2 px-1 text-xs text-slate-500">
+              <span>
+                {start + 1}–{Math.min(start + PER_PAGE, items.length)} / {items.length} · pg{' '}
+                {safePage}/{pages}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  disabled={safePage <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  ←
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={safePage >= pages}
+                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                >
+                  →
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
