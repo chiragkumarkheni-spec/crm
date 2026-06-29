@@ -22,10 +22,12 @@ export function istParts(d: Date = new Date()) {
   };
 }
 
-// Minutes since IST midnight right now — used for the office-hours window.
-export function istMinutesOfDay(d: Date = new Date()): number {
-  const { hour, minute } = istParts(d);
-  return hour * 60 + minute;
+// Minutes since IST midnight — used for the office-hours window, which the idle-
+// logout handler checks on every mousemove/keypress. Kept to pure integer math
+// (no Date object, no field reads) so this hottest path is as cheap as possible.
+export function istMinutesOfDay(epochMs: number = Date.now()): number {
+  const totalMin = Math.floor((epochMs + IST_OFFSET_MIN * 60000) / 60000);
+  return ((totalMin % 1440) + 1440) % 1440; // 0..1439, safe for any epoch
 }
 
 // A "YYYY-MM-DD" date + "HH:MM" time, understood as IST wall-clock, converted to
