@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { useApiData } from '@/lib/useApiData';
+import { usePresence } from '@/lib/usePresence';
+import { isWorkingHours, IDLE_WARN_MS } from '@/lib/format';
 import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 import { TwoFactorModal } from '@/components/TwoFactorModal';
 import type { Lead, Distributor } from '@/lib/types';
@@ -61,6 +63,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     summary: { suspicious: { type: string; value: string; count: number }[] };
   }>(user?.role === 'admin' ? '/api/auth/login-events?limit=1' : null);
   const suspiciousCount = loginSec?.summary?.suspicious?.length ?? 0;
+
+  // --- Idle-rep detection (working hours only) ---
+  // The rep's own idle time (for their own nudge). Admins don't heartbeat.
+  const myIdleMs = usePresence(user?.role === 'employee');
+  // Admin-only: who is sitting idle right now (app open, no action for 30+ min).
+  const { data: presence, refetch: refetchPresence } = useApiData<{
+    users: { _id: string; name: string; online: boolean; idle: boolean; idleMs: number | null }[];
+  }>(user?.role === 'admin' ? '/api/activity/presence' : null);
+
   const [nowTs, setNowTs] = useState(() => Date.now());
   useEffect(() => {
     // This tick re-renders the WHOLE app shell (sidebar + nav + banners) on every
@@ -71,12 +82,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       refetch();
       refetchDist();
       refetchLogin();
+      refetchPresence();
     }, 30000);
     return () => {
       clearInterval(tick);
       clearInterval(poll);
     };
-  }, [refetch, refetchDist, refetchLogin]);
+  }, [refetch, refetchDist, refetchLogin, refetchPresence]);
   const dueNowLeads = (dueLeads ?? []).filter(
     (l) => !l.nextFollowUpDate || new Date(l.nextFollowUpDate).getTime() <= nowTs
   );
@@ -102,6 +114,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const items = NAV.filter((n) => !n.adminOnly || user.role === 'admin');
+
+  // --- Idle nudges (only during working hours 09:45–19:00 IST) ---
+  const workingNow = isWorkingHours(nowTs);
+  // Rep sees their OWN "you stopped working" nudge.
+  const myIdleMin = Math.floor(myIdleMs / 60000);
+  const showMyIdle = user.role === 'employee' && workingNow && myIdleMs >= IDLE_WARN_MS;
+  // Admin sees WHICH reps are sitting idle (app open, no action for 30+ min).
+  const idleReps =
+    user.role === 'admin' && workingNow && presence
+      ? presence.users.filter((u) => u.idle)
+      : [];
   const initials =
     user.name
       ?.split(' ')
@@ -193,6 +216,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* ---- Main column ---- */}
       <div className="flex flex-1 flex-col min-w-0">
+        {/* Rep's own idle nudge — yellow line: "you stopped working". Shows during
+            working hours after 30 min of no mouse/keyboard activity. */}
+        {showMyIdle && (
+          <div className="sticky top-0 z-30 flex items-center justify-center gap-2 bg-amber-400 px-4 py-2.5 text-center text-sm font-semibold text-amber-950">
+            <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-amber-900" />
+            ⚠ Aap {myIdleMin} min se kuch nahi kar rahe — please kaam shuru karo.
+          </div>
+        )}
+
+        {/* Admin's idle-rep alert — yellow line listing reps sitting idle 30+ min,
+            so the admin knows who is logged in but not working. */}
+        {idleReps.length > 0 && (
+          <div className="sticky top-0 z-30 flex items-center justify-center gap-2 bg-amber-400 px-4 py-2.5 text-center text-sm font-semibold text-amber-950">
+            <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-amber-900" />
+            ⚠ {idleReps.length} rep 30+ min se idle {idleReps.length > 1 ? 'hain' : 'hai'} (kaam
+            nahi kar rahe):{' '}
+            {idleReps
+              .map((u) => `${u.name}${u.idleMs != null ? ` (${Math.floor(u.idleMs / 60000)}m)` : ''}`)
+              .join(', ')}
+          </div>
+        )}
+
         {/* Admin security alert — shows on EVERY page when logins are failing
             suspiciously, so a password-guessing attempt can't go unnoticed. */}
         {user.role === 'admin' && suspiciousCount > 0 && pathname !== '/admin' && (

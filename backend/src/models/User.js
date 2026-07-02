@@ -31,6 +31,12 @@ const userSchema = new mongoose.Schema(
     // default; `twoFactorEnabled` flips on only after the user confirms a code.
     twoFactorSecret: { type: String, select: false },
     twoFactorEnabled: { type: Boolean, default: false },
+    // Presence (idle-rep detection): `lastSeenAt` = when the app last sent a
+    // heartbeat (i.e. it is open), `lastActiveAt` = when the user last did a real
+    // action (mouse/keyboard). Both stamped on the SERVER clock so they stay
+    // comparable across PCs. Used to flag a rep sitting idle during working hours.
+    lastSeenAt: { type: Date },
+    lastActiveAt: { type: Date },
     // Soft delete: a "deleted" user is moved to the Recycle Bin (hidden from
     // the main list and unable to log in) but never removed from the database.
     deleted: { type: Boolean, default: false },

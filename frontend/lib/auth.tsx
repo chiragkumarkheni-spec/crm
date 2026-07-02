@@ -147,21 +147,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
     const TEN_MIN = 10 * 60 * 1000;
-    const TWENTY_MIN = 20 * 60 * 1000;
     const ONE_HOUR = 60 * 60 * 1000;
-    // Office hours are 09:30–19:00 India time (NOT the PC's local time, which may
+    // Working hours are 09:45–19:00 India time (NOT the PC's local time, which may
     // be set wrong — that was logging reps out mid-day on a 10-min strict timeout).
     const inOfficeHours = () => {
       const mins = istMinutesOfDay();
-      return mins >= 9 * 60 + 30 && mins < 19 * 60;
+      return mins >= 9 * 60 + 45 && mins < 19 * 60;
     };
-    // During office hours admins get 1 hour and reps get 20 minutes of idle
-    // time. Outside office hours everyone falls back to the strict 10-minute
-    // timeout. Recomputed on each idle check so the window tightens automatically
-    // once 19:00 passes.
+    // During working hours admins get 1 hour of idle before auto-logout, and reps
+    // are NOT auto-logged-out at all — instead they get a 30-minute "start working"
+    // nudge (see usePresence + the app-shell banner) so the admin can see an idle
+    // rep rather than have them silently disappear. Outside working hours everyone
+    // falls back to the strict 10-minute security logout. Recomputed on each check
+    // so the strict window kicks in automatically once 19:00 passes.
     const idleMs = () => {
       if (!inOfficeHours()) return TEN_MIN;
-      return user.role === 'admin' ? ONE_HOUR : TWENTY_MIN;
+      return user.role === 'admin' ? ONE_HOUR : Infinity;
     };
     // The input handler does the ABSOLUTE MINIMUM — it only stamps the time of
     // the last activity. This is what keeps a weak/old PC smooth: mousemove and

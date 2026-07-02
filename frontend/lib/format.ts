@@ -30,6 +30,18 @@ export function istMinutesOfDay(epochMs: number = Date.now()): number {
   return ((totalMin % 1440) + 1440) % 1440; // 0..1439, safe for any epoch
 }
 
+// Working hours (IST) during which reps are expected to be active: 09:45–19:00.
+const WORK_START_MIN = 9 * 60 + 45; // 09:45
+const WORK_END_MIN = 19 * 60; // 19:00
+export function isWorkingHours(epochMs: number = Date.now()): boolean {
+  const m = istMinutesOfDay(epochMs);
+  return m >= WORK_START_MIN && m < WORK_END_MIN;
+}
+
+// After this much continuous inactivity (no mouse/keyboard) during working hours a
+// rep is treated as "idle" — both the rep and the admin get a yellow nudge.
+export const IDLE_WARN_MS = 30 * 60 * 1000; // 30 minutes
+
 // A "YYYY-MM-DD" date + "HH:MM" time, understood as IST wall-clock, converted to
 // the matching absolute instant. Lets a rep pick "aaj 3:00 baje" and have it saved
 // as the right moment regardless of their PC's timezone.
